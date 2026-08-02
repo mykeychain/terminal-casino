@@ -38,6 +38,12 @@ type Model struct {
 	// recomputed signature differs, the cursor resets to 0.
 	menuSig string
 
+	// focusedSpot indexes the bet tile currently being adjusted during
+	// PhaseBetting. It is reset to 0 on entering betting (initial zero value and
+	// after NextHand / restart) and clamped into [0, NumSpots()) on every betting
+	// key and on add/remove.
+	focusedSpot int
+
 	// msg is a transient status line (e.g. rejected bet, reshuffle notice).
 	msg string
 }
@@ -112,6 +118,7 @@ func clampIdx(i, n int) int {
 }
 
 func (m Model) handleBetting(key string) (tea.Model, tea.Cmd) {
+	m.focusedSpot = clampIdx(m.focusedSpot, m.game.NumSpots())
 	switch key {
 	case "right", "up":
 		m.adjustBet(engine.BetIncrement)
@@ -121,6 +128,28 @@ func (m Model) handleBetting(key string) (tea.Model, tea.Cmd) {
 		m.adjustBet(coarseBetStep)
 	case "shift+left", "shift+down", "pgdown":
 		m.adjustBet(-coarseBetStep)
+	case "tab":
+		if m.focusedSpot < m.game.NumSpots()-1 {
+			m.focusedSpot++
+		}
+	case "shift+tab":
+		if m.focusedSpot > 0 {
+			m.focusedSpot--
+		}
+	case "a":
+		if err := m.game.AddSpot(); err != nil {
+			m.msg = "cannot add hand: " + err.Error()
+		} else {
+			m.focusedSpot = m.game.NumSpots() - 1
+			m.msg = ""
+		}
+	case "x", "backspace":
+		if err := m.game.RemoveSpot(m.focusedSpot); err != nil {
+			m.msg = "cannot remove hand: " + err.Error()
+		} else {
+			m.focusedSpot = clampIdx(m.focusedSpot, m.game.NumSpots())
+			m.msg = ""
+		}
 	case "enter", " ":
 		if err := m.game.Deal(); err != nil {
 			m.msg = "cannot deal: " + err.Error()
@@ -134,21 +163,32 @@ func (m Model) handleBetting(key string) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// adjustBet moves the pending bet by delta (a BetIncrement step), clamped to
-// [MinBet, bankroll] and snapped to a BetIncrement multiple, then pushes it
-// through the engine.
+// adjustBet moves the focused spot's bet by delta (a BetIncrement step), clamped
+// to [MinBet, bankroll − other spots' stakes] and snapped to a BetIncrement
+// multiple, then pushes it through the engine. If the focused spot cannot even
+// afford MinBet given the other stakes, the bet is left unchanged.
 func (m *Model) adjustBet(delta int) {
-	target := m.game.Bet() + delta
+	i := m.focusedSpot
+	target := m.game.SpotBet(i) + delta
 	if target < engine.MinBet {
 		target = engine.MinBet
 	}
-	if bank := m.game.Bankroll(); target > bank {
-		target = (bank / engine.BetIncrement) * engine.BetIncrement
+	othersTotal := 0
+	for j := 0; j < m.game.NumSpots(); j++ {
+		if j != i {
+			othersTotal += m.game.SpotBet(j)
+		}
+	}
+	if maxForSpot := m.game.Bankroll() - othersTotal; target > maxForSpot {
+		target = (maxForSpot / engine.BetIncrement) * engine.BetIncrement
 	}
 	if target%engine.BetIncrement != 0 {
 		target = (target / engine.BetIncrement) * engine.BetIncrement
 	}
-	if err := m.game.SetBet(target); err != nil {
+	if target < engine.MinBet {
+		return
+	}
+	if err := m.game.SetSpotBet(i, target); err != nil {
 		m.msg = "bet: " + err.Error()
 		return
 	}
@@ -157,7 +197,9 @@ func (m *Model) adjustBet(delta int) {
 
 func (m Model) handleInsurance(key string) (tea.Model, tea.Cmd) {
 	// Two-option yes/no menu (0 = Yes, 1 = No). Not sourced from LegalActions.
-	m = m.syncCursor("insurance", 2)
+	// Keying the signature on the offered spot re-presents the menu (defaulting to
+	// Yes) for each hand as the engine advances through them.
+	m = m.syncCursor(fmt.Sprintf("insurance|%d", m.game.InsuranceSpot()), 2)
 	switch key {
 	case "left", "up":
 		if m.cursor > 0 {
@@ -243,6 +285,7 @@ func (m Model) handleRoundOver(key string) (tea.Model, tea.Cmd) {
 			m.msg = err.Error()
 		} else {
 			m.msg = ""
+			m.focusedSpot = 0
 		}
 	}
 	return m, nil
@@ -265,6 +308,7 @@ func (m Model) handleGameOver(key string) (tea.Model, tea.Cmd) {
 			m.game = m.newGame()
 			m.menuSig = ""
 			m.cursor = 0
+			m.focusedSpot = 0
 			m.msg = ""
 		} else {
 			return m, tea.Quit
@@ -342,7 +386,31 @@ func (m Model) renderPlayerArea() string {
 		blocks[i] = m.renderHandBlock(i, h, len(hands) > 1, roundOver)
 	}
 	handsRow := lipgloss.JoinHorizontal(lipgloss.Top, blocks...)
-	return label + "\n" + handsRow
+	// Overflow: if the horizontal row of hand blocks would exceed the terminal
+	// width (even after compact cards), stack the blocks vertically so up to three
+	// hands with their splits stay readable.
+	if m.width > 0 && lipgloss.Width(handsRow) > m.width {
+		handsRow = lipgloss.JoinVertical(lipgloss.Left, blocks...)
+	}
+
+	out := label + "\n" + handsRow
+	if roundOver && len(hands) > 1 {
+		net := 0
+		for _, h := range hands {
+			net += h.Net
+		}
+		out += "\n" + renderRoundNet(net)
+	}
+	return out
+}
+
+// renderRoundNet formats the round's summed per-hand net: green when non-negative
+// (winStyle), red when negative (loseStyle).
+func renderRoundNet(net int) string {
+	if net >= 0 {
+		return winStyle.Render(fmt.Sprintf("Round net +$%d", net))
+	}
+	return loseStyle.Render(fmt.Sprintf("Round net -$%d", -net))
 }
 
 // renderHandBlock renders one player hand: a caption, the cards, and a footer
@@ -416,13 +484,14 @@ func (m Model) renderActionBar() string {
 	var title, body, hint string
 	switch m.game.Phase() {
 	case engine.PhaseBetting:
-		title = "Place your bet"
-		body = betStyle.Render(fmt.Sprintf("◀ $%d ▶", m.game.Bet()))
-		hint = fmt.Sprintf("← → $%d · shift+← → $%d · enter deal · q quit", engine.BetIncrement, coarseBetStep)
+		title, body = m.renderBettingPanel()
+		hint = m.bettingHint()
 	case engine.PhaseInsurance:
-		title = "Insurance"
-		half := m.game.Bet() / 2
-		body = dimStyle.Render(fmt.Sprintf("Dealer shows an Ace — insure for $%d?", half)) +
+		spot := m.game.InsuranceSpot()
+		handNo := spot + 1
+		half := m.game.SpotBet(spot) / 2
+		title = fmt.Sprintf("Insurance · Hand %d", handNo)
+		body = dimStyle.Render(fmt.Sprintf("Dealer shows an Ace — insure Hand %d for $%d?", handNo, half)) +
 			"\n" + renderMenu([]string{"Yes", "No"}, clampIdx(m.cursor, 2))
 		hint = "← → choose · enter confirm · q quit"
 	case engine.PhasePlayerTurn:
@@ -444,6 +513,71 @@ func (m Model) renderActionBar() string {
 		hint = "← → choose · enter confirm · q quit"
 	}
 	return titledBox(title, body) + "\n " + dimStyle.Render(hint)
+}
+
+// renderBettingPanel builds the betting panel's title and body. One opened hand
+// keeps the classic single gold ◀ $N ▶ control; two or more render a row of
+// per-hand bet tiles plus a staked/after-deal total line.
+func (m Model) renderBettingPanel() (title, body string) {
+	n := m.game.NumSpots()
+	if n <= 1 {
+		return "Place your bet", betStyle.Render(fmt.Sprintf("◀ $%d ▶", m.game.SpotBet(0)))
+	}
+	total := 0
+	for i := 0; i < n; i++ {
+		total += m.game.SpotBet(i)
+	}
+	after := m.game.Bankroll() - total
+	totalLine := dimStyle.Render(fmt.Sprintf("Total staked $%d · after deal $%d", total, after))
+	return "Place your bets", m.renderBetTiles() + "\n" + totalLine
+}
+
+// renderBetTiles lays out one bet tile per opened hand. The focused tile is
+// gold-bordered and shows ◀ $N ▶; the rest sit in a plain border showing $N.
+func (m Model) renderBetTiles() string {
+	n := m.game.NumSpots()
+	tiles := make([]string, n)
+	for i := 0; i < n; i++ {
+		label := fmt.Sprintf("Hand %d", i+1)
+		var value string
+		if i == m.focusedSpot {
+			value = betStyle.Render(fmt.Sprintf("◀ $%d ▶", m.game.SpotBet(i)))
+		} else {
+			value = fmt.Sprintf("$%d", m.game.SpotBet(i))
+		}
+		w := lipgloss.Width(label)
+		if vw := lipgloss.Width(value); vw > w {
+			w = vw
+		}
+		inner := center(label, w) + "\n" + center(value, w)
+		if i == m.focusedSpot {
+			tiles[i] = focusedTileStyle.Render(inner)
+		} else {
+			tiles[i] = plainTileStyle.Render(inner)
+		}
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Top, tiles...)
+}
+
+// bettingHint builds the contextual key hint for the betting screen: switch/remove
+// appear only with 2+ hands, and add is hidden once the spot cap is reached.
+func (m Model) bettingHint() string {
+	n := m.game.NumSpots()
+	parts := []string{
+		fmt.Sprintf("← → bet ±$%d", engine.BetIncrement),
+		fmt.Sprintf("shift ±$%d", coarseBetStep),
+	}
+	if n > 1 {
+		parts = append(parts, "tab ⇄ switch")
+	}
+	if n < engine.MaxSpots {
+		parts = append(parts, "a add hand")
+	}
+	if n > 1 {
+		parts = append(parts, "x remove")
+	}
+	parts = append(parts, "enter deal", "q quit")
+	return strings.Join(parts, " · ")
 }
 
 // titledBox draws a rounded panel around content with a label embedded in the top

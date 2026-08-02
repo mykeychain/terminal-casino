@@ -68,6 +68,19 @@ var (
 				Border(lipgloss.HiddenBorder()).
 				Padding(0, 1)
 
+	// focusedTileStyle / plainTileStyle draw the betting-screen bet tiles: the
+	// focused spot gets a gold rounded border (and shows ◀ $ ▶); the rest sit in a
+	// plain soft-white rounded border. Same padding keeps the row from jumping.
+	focusedTileStyle = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(colorFocus).
+				Padding(0, 1)
+
+	plainTileStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(colorBorder).
+			Padding(0, 1)
+
 	// panelBorderStyle / panelTitleStyle draw the rounded action panel and its
 	// embedded title label.
 	panelBorderStyle = lipgloss.NewStyle().Foreground(colorBorder)

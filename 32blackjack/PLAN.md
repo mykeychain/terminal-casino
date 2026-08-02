@@ -64,7 +64,7 @@ Owner: subagent. Spec: `MULTIHAND_SPEC.md` §0–1, §3.
 - Back-compat Bet()/SetBet on spot 0; all existing engine tests still pass + new §3 tests.
 **Gate:** build/vet/test green; engine UI-agnostic; API reviewed & frozen for UI.
 
-## Phase 8 — Multi-hand UI (bet-tile row, tab switch, add/remove, per-hand insurance)  ⬜
+## Phase 8 — Multi-hand UI (bet-tile row, tab switch, add/remove, per-hand insurance)  ✅
 Owner: subagent (after Phase 7 frozen). Spec: `MULTIHAND_SPEC.md` §2.
 - Betting bet-tile row (1 hand = single tile), Tab/Shift+Tab switch, ←/→ adjust,
   a add / x(Backspace) remove; per-hand insurance panel; round-net at settlement; overflow.

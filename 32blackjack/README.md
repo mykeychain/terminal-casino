@@ -29,9 +29,12 @@ the wager between `◀ ▶`), `←`/`→` move a gold highlight, and `Enter` con
 
 | Phase | Keys | Action |
 |---|---|---|
-| Betting | `←` / `→` (also `↑`/`↓`) | Lower / raise the bet by $1 (min $3, max = bankroll) |
+| Betting | `←` / `→` (also `↑`/`↓`) | Lower / raise the focused hand's bet by $1 (min $3) |
 | Betting | `Shift`+`←` / `→` (or `PgDn`/`PgUp`) | Lower / raise the bet by $25 (coarse step) |
-| Betting | `Enter` | Deal |
+| Betting | `a` | Open another hand (up to 3; each with its own bet) |
+| Betting | `x` / `Backspace` | Close the focused hand (min 1) |
+| Betting | `Tab` / `Shift`+`Tab` | Switch the focused hand |
+| Betting | `Enter` | Deal all hands |
 | Insurance (dealer shows Ace) | `←` / `→` then `Enter` | Select `Yes` / `No` (a fixed half-bet) |
 | Playing | `←` / `→` then `Enter` | Move the highlight over the legal actions (Hit / Stand / Double / Split) and confirm |
 | Round over | `Enter` | Next hand |
@@ -62,6 +65,9 @@ the engine would reject.
 
 - Starting bankroll **$1000** (resets every launch — no persistence).
 - **Minimum bet $3**, maximum is your current bankroll. Bets move in $1 increments.
+- You may **open up to 3 hands** in a round (`a` to add, `x` to remove, `Tab` to switch),
+  each with its own bet; the total staked must fit your bankroll. Insurance is offered
+  per hand, and each hand can still split independently.
 - The main bet is escrowed from your bankroll when the hand is dealt; settlement
   returns your stake plus any winnings.
 - Payouts: win 1:1, blackjack 3:2, push returns your bet, insurance 2:1.
