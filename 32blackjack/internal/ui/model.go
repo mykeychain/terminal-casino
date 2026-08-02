@@ -366,7 +366,10 @@ func (m Model) renderHandBlock(idx int, h engine.HandView, multi, roundOver bool
 }
 
 func (m Model) renderHandFooter(h engine.HandView, roundOver bool) string {
-	parts := []string{describeHandValue(h.Value, h.Soft, h.Blackjack)}
+	// The value column shows the hand total; the outcome column owns the verdict
+	// word. Suppress the "Blackjack!" label here once the round is settled so it
+	// isn't printed twice (value slot + outcome slot).
+	parts := []string{describeHandValue(h.Value, h.Soft, h.Blackjack && !roundOver)}
 	parts = append(parts, betStyle.Render(fmt.Sprintf("$%d", h.Bet)))
 	if h.Doubled {
 		parts = append(parts, dimStyle.Render("doubled"))
