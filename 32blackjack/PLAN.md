@@ -35,14 +35,14 @@ Owner: subagent
   game-over, cut-card reshuffle).
 **Gate:** `go test ./internal/engine/...` passes; meaningful coverage of the §7 list.
 
-## Phase 4 — TUI (model / update / view / card render / styles)  🔨
+## Phase 4 — TUI (model / update / view / card render / styles)  ✅
 Owner: subagent (starts only after engine API frozen in Phase 3)
 - Bubble Tea model over the engine; renders state, sends actions; no game logic in UI.
 - Card rendering (2-char rank field), face-down back, suit colors, dealer/player/status/action bars.
 - Controls per §6; insurance prompt; game-over restart; WindowSizeMsg resize.
 **Gate:** `go build ./...` clean; `go run ./cmd/32blackjack` launches; manual smoke of a hand.
 
-## Phase 5 — README + final polish  ⬜
+## Phase 5 — README + final polish  ✅
 Owner: orchestrator or subagent
 - README: run, controls, exact rules implemented.
 - Final `go build ./... && go vet ./... && go test ./...` green. Tidy go.mod.
@@ -59,6 +59,13 @@ imports, equal-**rank** split (face cards have distinct Rank constants), H17 dea
 peek routing, affordability-gated legal actions, split-ace one-and-done, 4-hand cap,
 natural auto-resolve + natural-vs-natural push, escrow at deal, settlement math.
 Engine API is **FROZEN** for the TUI.
+
+**Phase 4 (TUI) — APPROVED.** Reviewed by orchestrator: build/vet/test green; engine files
+unchanged (`git diff` empty); no game logic in UI — Update only routes keys to engine methods,
+re-checks `CanAct` before each call, action bar driven off `LegalActions()`, all displayed
+numbers from engine accessors. Card renderer uses fixed 2-char rank field; face-down hatch
+back; suit colors; active-hand highlight; compact fallback for ≤4 split hands; WindowSizeMsg
+handled; restart builds a fresh `NewGame` (time seed only in main).
 - Open flag (non-blocking): integer-dollar money floors 3:2 on odd-$25 bets ($25 BJ → $37,
   insurance on $25 → $12). Documented by subagent; tests use $100 to assert exact ratios.
   Decision pending with user; does not block UI (UI only displays engine values).
