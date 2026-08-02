@@ -48,7 +48,7 @@ Owner: orchestrator or subagent
 - Final `go build ./... && go vet ./... && go test ./...` green. Tidy go.mod.
 **Gate:** all deliverables (§8) satisfied.
 
-## Phase 6 — v1.1 feedback: money tweak + palette + arrow controls  🔨
+## Phase 6 — v1.1 feedback: money tweak + palette + arrow controls  ✅
 Owner: subagent
 - Engine: `MinBet` 25→3, bet increment 5→1; fix affected engine tests; logic otherwise unchanged.
 - UI palette (approved): gold=focus, green=money-good, red=loss/red-suits, slate card back.
@@ -58,6 +58,13 @@ Owner: subagent
 **Gate:** `go build/vet/test` green; engine still UI-agnostic; new frames reviewed.
 
 ---
+
+**Phase 6 — APPROVED.** Reviewed by orchestrator: build/vet/test green; engine `game.go` diff
+is ONLY `MinBet` 25→3 and `BetIncrement` 5→1 (logic untouched), all 28 tests still pass with
+updated thresholds. UI verified by reading source: palette centralized as named color vars per
+approved roles; red cards use soft-white border with only rank+suit red (`cardRedStyle`); arrow
+menu driven off `LegalActions()`, dispatched to engine methods with `CanAct` re-check, cursor
+clamped/reset by menu signature — no game logic in UI. Fresh frames sent for user review.
 
 ## Review log
 
