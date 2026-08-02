@@ -10,9 +10,9 @@ const (
 	// StartingBankroll is the player's starting money.
 	StartingBankroll = 1000
 	// MinBet is the table minimum (and the $-increment floor).
-	MinBet = 25
+	MinBet = 3
 	// BetIncrement is the smallest chip denomination; bets must be multiples.
-	BetIncrement = 5
+	BetIncrement = 1
 	// NumDecks is the shoe size.
 	NumDecks = 6
 	// MaxHands is the maximum number of hands a player may have after splits.

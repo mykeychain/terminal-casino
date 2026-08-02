@@ -47,7 +47,9 @@ func rankField(r engine.Rank, right bool) string {
 
 // renderCard renders a single face-up card as a 3-line body wrapped in a rounded
 // border: rank in the top-left AND bottom-right (fixed 2-char field) with a
-// centered suit. Hearts/diamonds are red; spades/clubs default.
+// centered suit. Every card shares the same soft-white border; only the rank
+// text and suit glyph are tinted — red for hearts/diamonds, soft white for
+// spades/clubs.
 func renderCard(c engine.Card) string {
 	top := padRight(rankField(c.Rank, false), cardInnerWidth)
 	mid := center(c.Suit.String(), cardInnerWidth)

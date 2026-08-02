@@ -105,9 +105,9 @@ These are fixed for v1. Implement precisely.
 - Starting bankroll: **$1000**.
 - **No persistence** — resets to $1000 every launch.
 - Player places a bet **each hand** before the deal.
-- **Minimum bet: $25.** Maximum bet: capped at current bankroll (no separate table max in v1).
+- **Minimum bet: $3** (v1.1 tweak — lowered from $25). Maximum bet: capped at current bankroll (no separate table max in v1).
 - **Bet is escrowed at deal** (locked decision 4): the main bet leaves bankroll when the hand is dealt; settlement returns stake + winnings.
-- **Chip denominations** for bet building/display: **$5, $25, $100, $500** (standard casino chip colors — white/red/black/purple respectively). Bets must be composable from these; min is $25 so $25 increments are fine; allow $5 increments if easy.
+- **Bet increment: $1** (v1.1 tweak — was $5). The wager adjusts up/down in whole-dollar steps, clamped to `[MinBet, bankroll]`.
 - Payouts:
   - Win: 1:1 (even money on bet).
   - Blackjack: 3:2.
@@ -115,13 +115,13 @@ These are fixed for v1. Implement precisely.
   - **Insurance: fixed side bet of exactly half the main bet** (locked decision 1); pays 2:1 if dealer has blackjack; requires funds beyond the escrowed main bet (locked decision 3).
   - Double: bet doubled, exactly one card drawn; requires funds for the additional bet (locked decision 3).
 - **Player natural blackjack** (locked decision 2): auto-resolved after peek, paid 3:2, no player turn; natural-vs-natural pushes.
-- If bankroll falls **below the $25 minimum**, show a game-over state with a restart option (`r`).
+- If bankroll falls **below the $3 minimum**, show a game-over state with a restart option.
 
 ---
 
 ## 5. Game Flow (state machine)
 
-1. **Betting** — player sets bet (≥ $25, ≤ bankroll). Confirms to deal.
+1. **Betting** — player sets bet (≥ $3, ≤ bankroll). Confirms to deal.
 2. **Deal** — main bet escrowed from bankroll. Two cards to player (face up), two to dealer (one up, one down). If the player has a natural, mark it for auto-resolution at step 4.
 3. **Insurance check** — if dealer upcard is Ace, offer insurance (yes/no, fixed `mainBet/2`, only if affordable) before dealer peek resolution.
 4. **Dealer peek** — if upcard is Ace or 10-value, dealer checks hole card for blackjack.
@@ -186,7 +186,7 @@ Unit-test the **engine** package thoroughly (no TUI), using the deterministic co
 - Payout math: blackjack 3:2, even-money win, push return, double, insurance 2:1.
 - **Insurance taken and dealer does NOT have blackjack** → insurance lost, main hand continues.
 - Multi-hand mixed settlement in one round (one wins, one busts, one pushes).
-- Bankroll → game-over transition (below $25 min).
+- Bankroll → game-over transition (below $3 min).
 - Cut-card reshuffle trigger.
 
 Provide a way to run the engine deterministically in tests (injectable seed/source or a way to stack the shoe).

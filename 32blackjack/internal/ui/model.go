@@ -10,24 +10,29 @@ import (
 	"github.com/mykeychain/terminal-casino/32blackjack/internal/engine"
 )
 
-// betStep is how much a single +/- keypress moves the bet. $25 is the table
-// minimum and a standard chip; the engine still enforces BetIncrement/bankroll
-// via SetBet, so any residual clamping is safe. (Resolved ambiguity: the spec
-// says "adjust by chip denomination"; we use the $25 chip as the step.)
-const betStep = engine.MinBet
-
 // compactWidthThreshold: below this terminal width, or with more than two hands,
 // cards are packed edge-to-edge so up to four split hands still fit.
 const compactWidthThreshold = 80
 
 // Model is the Bubble Tea model wrapping a frozen engine.Game. It renders engine
 // state and forwards player intent as engine actions; it computes no game logic.
+// Navigation is arrow-driven: the currently-legal choices are shown as a
+// horizontal menu and cursor selects one, which is then dispatched to the
+// matching engine method.
 type Model struct {
 	game    *engine.Game
 	newGame func() *engine.Game // produces a fresh game for restart (seeded by main)
 
 	width  int
 	height int
+
+	// cursor indexes the current phase's horizontal menu. It is clamped into the
+	// live menu range every frame and reset to 0 whenever the menu's signature
+	// changes (new phase, new active hand, a split, or a changed legal-action set).
+	cursor int
+	// menuSig is the signature of the menu the cursor currently indexes; when the
+	// recomputed signature differs, the cursor resets to 0.
+	menuSig string
 
 	// msg is a transient status line (e.g. rejected bet, reshuffle notice).
 	msg string
@@ -79,12 +84,35 @@ func (m Model) handleKey(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// syncCursor resets the cursor to 0 when the menu signature changed since the
+// last frame, then clamps it into [0, n). Model is a value type, so callers
+// reassign: m = m.syncCursor(...).
+func (m Model) syncCursor(sig string, n int) Model {
+	if sig != m.menuSig {
+		m.menuSig = sig
+		m.cursor = 0
+	}
+	m.cursor = clampIdx(m.cursor, n)
+	return m
+}
+
+// clampIdx pins i into [0, n) (returns 0 for an empty menu).
+func clampIdx(i, n int) int {
+	if n <= 0 || i < 0 {
+		return 0
+	}
+	if i >= n {
+		return n - 1
+	}
+	return i
+}
+
 func (m Model) handleBetting(key string) (tea.Model, tea.Cmd) {
 	switch key {
-	case "+", "=", "up", "right", "k", "l":
-		m.adjustBet(betStep)
-	case "-", "_", "down", "left", "j":
-		m.adjustBet(-betStep)
+	case "right", "up":
+		m.adjustBet(engine.BetIncrement)
+	case "left", "down":
+		m.adjustBet(-engine.BetIncrement)
 	case "enter", " ":
 		if err := m.game.Deal(); err != nil {
 			m.msg = "cannot deal: " + err.Error()
@@ -98,8 +126,9 @@ func (m Model) handleBetting(key string) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// adjustBet moves the pending bet by delta, clamped to [MinBet, bankroll] and
-// snapped to a BetIncrement multiple, then pushes it through the engine.
+// adjustBet moves the pending bet by delta (a BetIncrement step), clamped to
+// [MinBet, bankroll] and snapped to a BetIncrement multiple, then pushes it
+// through the engine.
 func (m *Model) adjustBet(delta int) {
 	target := m.game.Bet() + delta
 	if target < engine.MinBet {
@@ -119,48 +148,89 @@ func (m *Model) adjustBet(delta int) {
 }
 
 func (m Model) handleInsurance(key string) (tea.Model, tea.Cmd) {
+	// Two-option yes/no menu (0 = Yes, 1 = No). Not sourced from LegalActions.
+	m = m.syncCursor("insurance", 2)
 	switch key {
-	case "y", "Y":
-		_ = m.game.Insurance(true)
-		m.msg = ""
-	case "n", "N":
-		_ = m.game.Insurance(false)
+	case "left", "up":
+		if m.cursor > 0 {
+			m.cursor--
+		}
+	case "right", "down":
+		if m.cursor < 1 {
+			m.cursor++
+		}
+	case "enter", " ":
+		_ = m.game.Insurance(m.cursor == 0)
 		m.msg = ""
 	}
 	return m, nil
 }
 
 func (m Model) handlePlayerTurn(key string) (tea.Model, tea.Cmd) {
-	var (
-		action engine.Action
-		call   func() error
-	)
+	actions := m.playerActions()
+	m = m.syncCursor(playerTurnSig(m.game, actions), len(actions))
+
 	switch key {
-	case "h":
-		action, call = engine.ActionHit, m.game.Hit
-	case "s":
-		action, call = engine.ActionStand, m.game.Stand
-	case "d":
-		action, call = engine.ActionDouble, m.game.Double
-	case "p":
-		action, call = engine.ActionSplit, m.game.Split
-	default:
-		return m, nil
-	}
-	// Only invoke when the engine says the action is currently legal.
-	if !m.game.CanAct(action) {
-		return m, nil
-	}
-	if err := call(); err != nil {
-		m.msg = action.String() + ": " + err.Error()
-	} else {
-		m.msg = ""
+	case "left", "up":
+		if m.cursor > 0 {
+			m.cursor--
+		}
+	case "right", "down":
+		if m.cursor < len(actions)-1 {
+			m.cursor++
+		}
+	case "enter", " ":
+		if len(actions) == 0 {
+			return m, nil
+		}
+		a := actions[m.cursor]
+		// Defense in depth: re-check legality against the engine before calling.
+		if !m.game.CanAct(a) {
+			return m, nil
+		}
+		var err error
+		switch a {
+		case engine.ActionHit:
+			err = m.game.Hit()
+		case engine.ActionStand:
+			err = m.game.Stand()
+		case engine.ActionDouble:
+			err = m.game.Double()
+		case engine.ActionSplit:
+			err = m.game.Split()
+		}
+		if err != nil {
+			m.msg = a.String() + ": " + err.Error()
+		} else {
+			m.msg = ""
+		}
 	}
 	return m, nil
 }
 
+// playerActions returns the currently-legal player-turn actions, in menu order,
+// sourced entirely from the engine's legal-action set.
+func (m Model) playerActions() []engine.Action {
+	var out []engine.Action
+	for _, a := range m.game.LegalActions() {
+		switch a {
+		case engine.ActionHit, engine.ActionStand, engine.ActionDouble, engine.ActionSplit:
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
+// playerTurnSig identifies the current decision point. It changes on a new
+// active hand, after a split (hand count changes), and whenever the legal-action
+// set changes — any of which resets the menu cursor to 0.
+func playerTurnSig(g *engine.Game, actions []engine.Action) string {
+	return fmt.Sprintf("pt|%d|%d|%v", len(g.Player()), g.ActiveHandIndex(), actions)
+}
+
 func (m Model) handleRoundOver(key string) (tea.Model, tea.Cmd) {
-	if key == "enter" || key == " " || key == "n" {
+	m = m.syncCursor("round-over", 1)
+	if key == "enter" || key == " " {
 		if err := m.game.NextHand(); err != nil {
 			m.msg = err.Error()
 		} else {
@@ -171,9 +241,26 @@ func (m Model) handleRoundOver(key string) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleGameOver(key string) (tea.Model, tea.Cmd) {
-	if key == "r" {
-		m.game = m.newGame()
-		m.msg = ""
+	// Menu: 0 = Restart, 1 = Quit.
+	m = m.syncCursor("game-over", 2)
+	switch key {
+	case "left", "up":
+		if m.cursor > 0 {
+			m.cursor--
+		}
+	case "right", "down":
+		if m.cursor < 1 {
+			m.cursor++
+		}
+	case "enter", " ":
+		if m.cursor == 0 {
+			m.game = m.newGame()
+			m.menuSig = ""
+			m.cursor = 0
+			m.msg = ""
+		} else {
+			return m, tea.Quit
+		}
 	}
 	return m, nil
 }
@@ -319,64 +406,70 @@ func (m Model) renderStatusBar() string {
 	return line
 }
 
-// renderActionBar shows only currently-legal key hints. During the player's
-// turn it is driven directly off engine.LegalActions() so the UI can never
-// advertise an action the engine would reject.
+// renderActionBar renders the arrow-navigation menu for the current phase with
+// the selected item highlighted, plus a small dim navigation hint. During the
+// player's turn the menu is driven directly off engine.LegalActions(), so the UI
+// can never advertise an action the engine would reject.
 func (m Model) renderActionBar() string {
-	var hints []string
+	var menu, hint string
 	switch m.game.Phase() {
 	case engine.PhaseBetting:
-		hints = []string{
-			hint("+/-", "bet"),
-			hint("enter", "deal"),
-			hint("q", "quit"),
-		}
+		menu = betStyle.Render(fmt.Sprintf("◀ $%d ▶", m.game.Bet()))
+		hint = "← → adjust · enter deal · q quit"
 	case engine.PhaseInsurance:
 		half := m.game.Bet() / 2
-		hints = []string{
-			dimStyle.Render(fmt.Sprintf("Dealer shows an Ace. Insurance $%d?", half)),
-			hint("y", "yes"),
-			hint("n", "no"),
-		}
+		prompt := dimStyle.Render(fmt.Sprintf("Dealer shows an Ace. Insurance $%d?  ", half))
+		menu = prompt + renderMenu([]string{"Yes", "No"}, clampIdx(m.cursor, 2))
+		hint = "← → choose · enter confirm · q quit"
 	case engine.PhasePlayerTurn:
-		for _, a := range m.game.LegalActions() {
-			if key, label, ok := actionHint(a); ok {
-				hints = append(hints, hint(key, label))
-			}
+		actions := m.playerActions()
+		labels := make([]string, len(actions))
+		for i, a := range actions {
+			labels[i] = actionLabel(a)
 		}
-		hints = append(hints, hint("q", "quit"))
+		menu = renderMenu(labels, clampIdx(m.cursor, len(actions)))
+		hint = "← → choose · enter confirm · q quit"
 	case engine.PhaseRoundOver:
-		hints = []string{
-			hint("enter", "next hand"),
-			hint("q", "quit"),
-		}
+		menu = renderMenu([]string{"Next hand"}, 0)
+		hint = "enter continue · q quit"
 	case engine.PhaseGameOver:
-		hints = []string{
-			hint("r", "restart"),
-			hint("q", "quit"),
-		}
+		menu = renderMenu([]string{"Restart", "Quit"}, clampIdx(m.cursor, 2))
+		hint = "← → choose · enter confirm · q quit"
 	}
-	return actionBarStyle.Render(strings.Join(hints, "   "))
+	return actionBarStyle.Render(menu + "\n" + dimStyle.Render(hint))
 }
 
-// actionHint maps a legal engine action to its key binding and label.
-func actionHint(a engine.Action) (key, label string, ok bool) {
+// renderMenu lays a set of labels out horizontally, highlighting the selected one
+// in gold.
+func renderMenu(labels []string, selected int) string {
+	if len(labels) == 0 {
+		return ""
+	}
+	parts := make([]string, len(labels))
+	for i, l := range labels {
+		if i == selected {
+			parts[i] = menuSelectedStyle.Render(l)
+		} else {
+			parts[i] = menuUnselectedStyle.Render(l)
+		}
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Top, parts...)
+}
+
+// actionLabel maps a legal engine action to its menu label.
+func actionLabel(a engine.Action) string {
 	switch a {
 	case engine.ActionHit:
-		return "h", "hit", true
+		return "Hit"
 	case engine.ActionStand:
-		return "s", "stand", true
+		return "Stand"
 	case engine.ActionDouble:
-		return "d", "double", true
+		return "Double"
 	case engine.ActionSplit:
-		return "p", "split", true
+		return "Split"
 	default:
-		return "", "", false
+		return a.String()
 	}
-}
-
-func hint(key, label string) string {
-	return keyHintStyle.Render("["+key+"]") + " " + label
 }
 
 // describeHandValue formats a value with its soft/hard qualifier, or a special
@@ -385,7 +478,7 @@ func hint(key, label string) string {
 func describeHandValue(value int, soft, blackjack bool) string {
 	switch {
 	case blackjack:
-		return winStyle.Render("Blackjack!")
+		return blackjackStyle.Render("Blackjack!")
 	case value > 21:
 		return loseStyle.Render(fmt.Sprintf("bust (%d)", value))
 	case soft:
@@ -399,7 +492,7 @@ func describeHandValue(value int, soft, blackjack bool) string {
 func outcomeText(o engine.Outcome, net int) string {
 	switch o {
 	case engine.OutcomeBlackjack:
-		return winStyle.Render(fmt.Sprintf("Blackjack! +$%d", net))
+		return blackjackStyle.Render(fmt.Sprintf("Blackjack! +$%d", net))
 	case engine.OutcomeWin:
 		return winStyle.Render(fmt.Sprintf("Win +$%d", net))
 	case engine.OutcomePush:

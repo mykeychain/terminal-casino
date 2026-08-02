@@ -24,21 +24,22 @@ go test ./...
 
 ## Controls
 
+Navigation is arrow-driven: each phase shows a horizontal menu (or, when betting,
+the wager between `◀ ▶`), `←`/`→` move a gold highlight, and `Enter` confirms.
+
 | Phase | Keys | Action |
 |---|---|---|
-| Betting | `+` / `-` (also arrows, `k`/`j`) | Raise / lower bet by $25 (min $25, max = bankroll) |
+| Betting | `←` / `→` (also `↑`/`↓`) | Lower / raise the bet by $1 (min $3, max = bankroll) |
 | Betting | `Enter` | Deal |
-| Insurance (dealer shows Ace) | `y` / `n` | Take / decline insurance (a fixed half-bet) |
-| Playing | `h` | Hit |
-| Playing | `s` | Stand |
-| Playing | `d` | Double (first two cards, non-split-ace, if funded) |
-| Playing | `p` | Split (equal-rank pair, if funded) |
+| Insurance (dealer shows Ace) | `←` / `→` then `Enter` | Select `Yes` / `No` (a fixed half-bet) |
+| Playing | `←` / `→` then `Enter` | Move the highlight over the legal actions (Hit / Stand / Double / Split) and confirm |
 | Round over | `Enter` | Next hand |
-| Game over | `r` | Restart with a fresh $1000 |
+| Game over | `←` / `→` then `Enter` | Select `Restart` (fresh $1000) or `Quit` |
 | Anytime | `q` / `Ctrl+C` | Quit |
 
-The action bar only shows actions that are currently legal — it is driven directly
-by the engine, so a hint never appears for a move the engine would reject.
+The player-turn menu only lists actions that are currently legal — it is driven
+directly by the engine's legal-action set, so an option never appears for a move
+the engine would reject.
 
 ## Rules implemented (exact)
 
@@ -59,16 +60,16 @@ by the engine, so a hint never appears for a move the engine would reject.
 ### Money & betting
 
 - Starting bankroll **$1000** (resets every launch — no persistence).
-- **Minimum bet $25**, maximum is your current bankroll. Bets move in $5 increments.
+- **Minimum bet $3**, maximum is your current bankroll. Bets move in $1 increments.
 - The main bet is escrowed from your bankroll when the hand is dealt; settlement
   returns your stake plus any winnings.
 - Payouts: win 1:1, blackjack 3:2, push returns your bet, insurance 2:1.
 - Split, double, and insurance each require enough bankroll to fund the extra bet —
   if you can't cover it, the action isn't offered.
-- If your bankroll falls below the $25 minimum, the game ends with a restart option.
+- If your bankroll falls below the $3 minimum, the game ends with a restart option.
 
-> Money is tracked in whole dollars, so a 3:2 payout on an odd-$25 bet is floored
-> to the nearest dollar (a $25 blackjack pays $37). Even-dollar bets ($50, $100, …)
+> Money is tracked in whole dollars, so a 3:2 payout on an odd bet is floored to
+> the nearest dollar (a $3 blackjack pays $4). Even-dollar bets ($10, $100, …)
 > pay exactly.
 
 ## Architecture

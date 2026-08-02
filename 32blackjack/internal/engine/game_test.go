@@ -78,12 +78,12 @@ func TestSplitAndDoubleLegalWhenFunded(t *testing.T) {
 }
 
 func TestSplitDoubleIllegalWhenUnderfunded(t *testing.T) {
-	// Bankroll 49: after escrowing the $25 main bet only $24 remains, which
-	// cannot fund the extra $25 for split or double.
-	g := NewGameWithShoe(49, stack(Eight, Six, Eight, Ten))
+	// Bankroll 5: after escrowing the $3 main bet only $2 remains, which
+	// cannot fund the extra $3 for split or double.
+	g := NewGameWithShoe(5, stack(Eight, Six, Eight, Ten))
 	mustDeal(t, g)
-	if g.Bankroll() != 24 {
-		t.Fatalf("post-escrow bankroll = %d, want 24", g.Bankroll())
+	if g.Bankroll() != 2 {
+		t.Fatalf("post-escrow bankroll = %d, want 2", g.Bankroll())
 	}
 	if hasAction(g, ActionSplit) {
 		t.Error("split must be illegal when unaffordable")
@@ -445,7 +445,7 @@ func TestMixedMultiHandSettlement(t *testing.T) {
 			t.Errorf("hand %d outcome = %v, want %v", i, hands[i].Outcome, w)
 		}
 	}
-	// +25 (win) + 0 (push) - 25 (lose) = net 0.
+	// +3 (win) + 0 (push) - 3 (lose) = net 0.
 	if g.Bankroll() != 1000 {
 		t.Errorf("bankroll = %d, want 1000", g.Bankroll())
 	}
@@ -454,14 +454,14 @@ func TestMixedMultiHandSettlement(t *testing.T) {
 // ---- Game over ----
 
 func TestBankrollGameOver(t *testing.T) {
-	// Bankroll 30, bet 25. Player 16 loses to dealer 19; bankroll -> 5 (< min).
-	g := NewGameWithShoe(30, stack(Ten, Nine, Six, King))
+	// Bankroll 5, bet 3. Player 16 loses to dealer 19; bankroll -> 2 (< min).
+	g := NewGameWithShoe(5, stack(Ten, Nine, Six, King))
 	mustDeal(t, g)
 	if err := g.Stand(); err != nil {
 		t.Fatal(err)
 	}
-	if g.Bankroll() != 5 {
-		t.Fatalf("bankroll = %d, want 5", g.Bankroll())
+	if g.Bankroll() != 2 {
+		t.Fatalf("bankroll = %d, want 2", g.Bankroll())
 	}
 	if g.Phase() != PhaseRoundOver {
 		t.Fatalf("phase = %v, want round-over", g.Phase())
