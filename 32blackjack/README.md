@@ -30,6 +30,7 @@ the wager between `◀ ▶`), `←`/`→` move a gold highlight, and `Enter` con
 | Phase | Keys | Action |
 |---|---|---|
 | Betting | `←` / `→` (also `↑`/`↓`) | Lower / raise the bet by $1 (min $3, max = bankroll) |
+| Betting | `Shift`+`←` / `→` (or `PgDn`/`PgUp`) | Lower / raise the bet by $25 (coarse step) |
 | Betting | `Enter` | Deal |
 | Insurance (dealer shows Ace) | `←` / `→` then `Enter` | Select `Yes` / `No` (a fixed half-bet) |
 | Playing | `←` / `→` then `Enter` | Move the highlight over the legal actions (Hit / Stand / Double / Split) and confirm |

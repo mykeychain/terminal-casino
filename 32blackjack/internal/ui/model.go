@@ -14,6 +14,10 @@ import (
 // cards are packed edge-to-edge so up to four split hands still fit.
 const compactWidthThreshold = 80
 
+// coarseBetStep is the larger bet increment used by Shift+arrow / PgUp-PgDn, for
+// moving the wager quickly; plain arrows still step by engine.BetIncrement ($1).
+const coarseBetStep = 25
+
 // Model is the Bubble Tea model wrapping a frozen engine.Game. It renders engine
 // state and forwards player intent as engine actions; it computes no game logic.
 // Navigation is arrow-driven: the currently-legal choices are shown as a
@@ -113,6 +117,10 @@ func (m Model) handleBetting(key string) (tea.Model, tea.Cmd) {
 		m.adjustBet(engine.BetIncrement)
 	case "left", "down":
 		m.adjustBet(-engine.BetIncrement)
+	case "shift+right", "shift+up", "pgup":
+		m.adjustBet(coarseBetStep)
+	case "shift+left", "shift+down", "pgdown":
+		m.adjustBet(-coarseBetStep)
 	case "enter", " ":
 		if err := m.game.Deal(); err != nil {
 			m.msg = "cannot deal: " + err.Error()
@@ -418,7 +426,7 @@ func (m Model) renderActionBar() string {
 	switch m.game.Phase() {
 	case engine.PhaseBetting:
 		menu = betStyle.Render(fmt.Sprintf("◀ $%d ▶", m.game.Bet()))
-		hint = "← → adjust · enter deal · q quit"
+		hint = fmt.Sprintf("← → $%d · shift+← → $%d · enter deal · q quit", engine.BetIncrement, coarseBetStep)
 	case engine.PhaseInsurance:
 		half := m.game.Bet() / 2
 		prompt := dimStyle.Render(fmt.Sprintf("Dealer shows an Ace. Insurance $%d?  ", half))
