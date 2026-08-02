@@ -57,7 +57,7 @@ Owner: subagent
 - Update README + SPEC money/controls to match.
 **Gate:** `go build/vet/test` green; engine still UI-agnostic; new frames reviewed.
 
-## Phase 7 — Multi-hand engine (per-spot bets, deal N, per-hand naturals/insurance)  🔨
+## Phase 7 — Multi-hand engine (per-spot bets, deal N, per-hand naturals/insurance)  ✅
 Owner: subagent. Spec: `MULTIHAND_SPEC.md` §0–1, §3.
 - MaxSpots=3; per-spot bets + Add/Remove/SetSpotBet; Deal N hands; per-hand naturals;
   per-spot split cap; per-hand insurance loop; settlement skips resolved naturals.
@@ -80,6 +80,15 @@ menu driven off `LegalActions()`, dispatched to engine methods with `CanAct` re-
 clamped/reset by menu signature — no game logic in UI. Fresh frames sent for user review.
 
 ## Review log
+
+**Phase 7 (multi-hand engine) — APPROVED.** Reviewed by orchestrator by reading game.go:
+28 existing + 10 new tests pass; only game.go changed + multihand_test.go added; no UI
+imports, no global rand/time/crypto. Verified: single-hand path preserved (Bet()/SetBet →
+spot 0, deal order reduces to classic for 1 spot); per-hand naturals resolve at peek without
+revealing hole (payNatural), settlement skips outcome!=Pending so no double-settle;
+per-hand insurance via advanceInsurance with sequential affordability; per-spot split cap
+(spotHandCount); betting validates sum-of-bets ≤ bankroll. **API FROZEN for Phase 8 UI:**
+NumSpots/SpotBet/SetSpotBet/AddSpot/RemoveSpot, InsuranceSpot, HandView.Spot + existing.
 
 **Phases 1–3 (engine) — APPROVED.** Reviewed by orchestrator (not just trusting subagent report):
 build/vet/test run independently → green; `go test` 28 test funcs, 81% stmt coverage.

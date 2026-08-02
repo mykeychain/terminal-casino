@@ -15,8 +15,12 @@ const (
 	BetIncrement = 1
 	// NumDecks is the shoe size.
 	NumDecks = 6
-	// MaxHands is the maximum number of hands a player may have after splits.
+	// MaxHands is the maximum number of hands a single spot may reach after
+	// splits. Enforced per spot (a split counts only hands sharing that spot).
 	MaxHands = 4
+	// MaxSpots is the maximum number of opened hands (betting positions) a
+	// player may set up before the deal.
+	MaxSpots = 3
 )
 
 // pcgStream is a fixed second PCG parameter so a single int64 seed fully
@@ -27,10 +31,10 @@ const pcgStream = 0x9E3779B97F4A7C15
 type Phase int
 
 const (
-	// PhaseBetting: player sets a bet and calls Deal.
+	// PhaseBetting: player sets bets (one per opened spot) and calls Deal.
 	PhaseBetting Phase = iota
-	// PhaseInsurance: dealer shows an Ace and insurance is affordable; player
-	// must answer Insurance(bool).
+	// PhaseInsurance: dealer shows an Ace and insurance is affordable for at
+	// least one spot; the player answers Insurance(bool) for each offered spot.
 	PhaseInsurance
 	// PhasePlayerTurn: player acts on the active hand.
 	PhasePlayerTurn
@@ -128,13 +132,20 @@ var (
 // engine's internal representation; the UI reads the exported HandView instead.
 type playerHand struct {
 	hand      Hand
+	spot      int     // originating opened-spot index (splits inherit the parent's)
 	bet       int     // amount escrowed for this hand (doubles/splits included)
 	doubled   bool    // hand was doubled (drew exactly one extra card)
 	stood     bool    // hand is finished (stood, doubled, bust, or 21)
 	splitAce  bool    // hand came from splitting aces (one-and-done)
 	fromSplit bool    // hand came from any split (a two-card 21 is not a natural)
+	natural   bool    // this spot's initial two-card hand was a natural
 	outcome   Outcome // settled outcome
 	net       int     // net change to bankroll from this hand (profit or -stake)
+
+	// Per-spot insurance side bet (tracked on the spot's initial hand).
+	insuranceTaken bool
+	insuranceBet   int
+	insuranceNet   int
 }
 
 // Game holds all mutable state for one blackjack game. Nothing is stored at
@@ -144,7 +155,7 @@ type Game struct {
 	shoe *Shoe
 
 	bankroll int
-	bet      int // the pending bet set during PhaseBetting
+	spotBets []int // pending per-spot bets during PhaseBetting (length 1..MaxSpots)
 	phase    Phase
 
 	// Round state.
@@ -154,11 +165,8 @@ type Game struct {
 
 	dealerRevealed bool // dealer hole card is visible
 	dealerBJ       bool // dealer had a natural blackjack (peek)
-	playerNatural  bool // the initial player hand was a natural
 
-	tookInsurance bool
-	insuranceBet  int
-	insuranceNet  int // net change from the insurance side bet, after settlement
+	insuranceSpot int // spot currently offered insurance (-1 when none)
 
 	reshuffled bool // the most recent Deal triggered a reshuffle
 }
@@ -169,10 +177,11 @@ type Game struct {
 func NewGame(seed int64) *Game {
 	rng := rand.New(rand.NewPCG(uint64(seed), pcgStream))
 	g := &Game{
-		rng:      rng,
-		bankroll: StartingBankroll,
-		bet:      MinBet,
-		phase:    PhaseBetting,
+		rng:           rng,
+		bankroll:      StartingBankroll,
+		spotBets:      []int{MinBet},
+		phase:         PhaseBetting,
+		insuranceSpot: -1,
 	}
 	g.shoe = newShoe(NumDecks, rng)
 	return g
@@ -180,14 +189,20 @@ func NewGame(seed int64) *Game {
 
 // NewGameWithShoe constructs a game with a pre-stacked shoe and a chosen
 // starting bankroll, for deterministic tests. Cards are dealt from index 0.
-// The deal order is: player card 1, dealer up-card, player card 2, dealer hole
-// card, then subsequent draws in order. Keep fewer than CutCardPosition draws
-// so no reshuffle is attempted (the stacked shoe owns no RNG).
+//
+// Single-spot deal order (one opened hand): player card 1, dealer up-card,
+// player card 2, dealer hole card, then subsequent draws in order.
+//
+// Multi-spot deal order (N opened hands, L->R): one card to each spot, dealer
+// up-card, a second card to each spot, dealer hole card, then subsequent draws
+// in order. See Deal for details. Keep fewer than CutCardPosition draws so no
+// reshuffle is attempted (the stacked shoe owns no RNG).
 func NewGameWithShoe(bankroll int, cards []Card) *Game {
 	g := &Game{
-		bankroll: bankroll,
-		bet:      MinBet,
-		phase:    PhaseBetting,
+		bankroll:      bankroll,
+		spotBets:      []int{MinBet},
+		phase:         PhaseBetting,
+		insuranceSpot: -1,
 	}
 	g.shoe = newStackedShoe(cards)
 	return g
@@ -201,20 +216,58 @@ func (g *Game) Phase() Phase { return g.phase }
 // Bankroll returns the current (post-escrow) bankroll.
 func (g *Game) Bankroll() int { return g.bankroll }
 
-// Bet returns the pending main bet.
-func (g *Game) Bet() int { return g.bet }
+// NumSpots returns the number of opened hands (betting positions).
+func (g *Game) NumSpots() int { return len(g.spotBets) }
+
+// SpotBet returns the pending bet for opened spot i (0 if i is out of range).
+// The value is the spot's original stake and is unaffected by later doubles or
+// splits, so it remains valid for insurance sizing during play.
+func (g *Game) SpotBet(i int) int {
+	if i < 0 || i >= len(g.spotBets) {
+		return 0
+	}
+	return g.spotBets[i]
+}
+
+// Bet returns the pending main bet (opened spot 0), for single-hand back-compat.
+func (g *Game) Bet() int { return g.SpotBet(0) }
 
 // ActiveHandIndex returns the index of the hand currently being played.
 func (g *Game) ActiveHandIndex() int { return g.active }
 
-// TookInsurance reports whether the player took insurance this round.
-func (g *Game) TookInsurance() bool { return g.tookInsurance }
+// InsuranceSpot returns the spot index currently being offered insurance during
+// PhaseInsurance, or -1 when no offer is active. The offered amount is
+// SpotBet(InsuranceSpot())/2.
+func (g *Game) InsuranceSpot() int { return g.insuranceSpot }
 
-// InsuranceBet returns the insurance side-bet amount (0 if none).
-func (g *Game) InsuranceBet() int { return g.insuranceBet }
+// TookInsurance reports whether the player took insurance on any spot this round.
+func (g *Game) TookInsurance() bool {
+	for _, h := range g.hands {
+		if h.insuranceTaken {
+			return true
+		}
+	}
+	return false
+}
 
-// InsuranceNet returns the net bankroll change from insurance after settlement.
-func (g *Game) InsuranceNet() int { return g.insuranceNet }
+// InsuranceBet returns the total insurance side-bet posted across all spots.
+func (g *Game) InsuranceBet() int {
+	total := 0
+	for _, h := range g.hands {
+		total += h.insuranceBet
+	}
+	return total
+}
+
+// InsuranceNet returns the total net bankroll change from insurance across all
+// spots after settlement.
+func (g *Game) InsuranceNet() int {
+	total := 0
+	for _, h := range g.hands {
+		total += h.insuranceNet
+	}
+	return total
+}
 
 // DealerHadBlackjack reports whether the dealer had a natural (known after peek).
 func (g *Game) DealerHadBlackjack() bool { return g.dealerBJ }
@@ -235,6 +288,7 @@ type HandView struct {
 	Soft      bool
 	Bust      bool
 	Blackjack bool // a scoring natural (two-card 21, not from a split)
+	Spot      int  // originating opened-spot index
 	Bet       int
 	Doubled   bool
 	SplitAce  bool
@@ -254,6 +308,7 @@ func (g *Game) Player() []HandView {
 			Soft:      soft,
 			Bust:      h.hand.IsBust(),
 			Blackjack: h.hand.IsBlackjack() && !h.fromSplit,
+			Spot:      h.spot,
 			Bet:       h.bet,
 			Doubled:   h.doubled,
 			SplitAce:  h.splitAce,
@@ -314,13 +369,26 @@ func (g *Game) LegalActions() []Action {
 		}
 		if twoCards && !h.splitAce &&
 			h.hand.Cards[0].Rank == h.hand.Cards[1].Rank &&
-			len(g.hands) < MaxHands && g.canAfford(h.bet) {
+			g.spotHandCount(h.spot) < MaxHands && g.canAfford(h.bet) {
 			acts = append(acts, ActionSplit)
 		}
 		return acts
 	default:
 		return nil
 	}
+}
+
+// spotHandCount returns how many current hands originate from the given spot.
+// The split cap (MaxHands) is enforced per spot, so opening or splitting one
+// spot never affects another's legality.
+func (g *Game) spotHandCount(spot int) int {
+	n := 0
+	for _, h := range g.hands {
+		if h.spot == spot {
+			n++
+		}
+	}
+	return n
 }
 
 // CanAct reports whether the given action is currently legal.
@@ -337,29 +405,92 @@ func (g *Game) canAfford(amount int) bool { return g.bankroll >= amount }
 
 // ---- Betting ----
 
-// SetBet sets the pending main bet. It must be at least MinBet, no more than
-// the current bankroll, and a multiple of BetIncrement.
-func (g *Game) SetBet(amount int) error {
+// SetSpotBet sets the pending bet for opened spot i. The amount must be at least
+// MinBet, a multiple of BetIncrement, and leave the new total across all spots
+// no greater than the current bankroll.
+func (g *Game) SetSpotBet(i, amount int) error {
 	if g.phase != PhaseBetting {
 		return ErrWrongPhase
 	}
-	if amount < MinBet || amount > g.bankroll || amount%BetIncrement != 0 {
+	if i < 0 || i >= len(g.spotBets) {
+		return ErrIllegalAction
+	}
+	if amount < MinBet || amount%BetIncrement != 0 {
 		return ErrInvalidBet
 	}
-	g.bet = amount
+	if g.totalStaked()-g.spotBets[i]+amount > g.bankroll {
+		return ErrInvalidBet
+	}
+	g.spotBets[i] = amount
 	return nil
+}
+
+// SetBet sets the pending main bet (opened spot 0), for single-hand back-compat.
+func (g *Game) SetBet(amount int) error { return g.SetSpotBet(0, amount) }
+
+// AddSpot opens an additional betting position at MinBet. It fails if the cap
+// (MaxSpots) is reached or the new total would exceed the bankroll.
+func (g *Game) AddSpot() error {
+	if g.phase != PhaseBetting {
+		return ErrWrongPhase
+	}
+	if len(g.spotBets) >= MaxSpots {
+		return ErrIllegalAction
+	}
+	if g.totalStaked()+MinBet > g.bankroll {
+		return ErrInvalidBet
+	}
+	g.spotBets = append(g.spotBets, MinBet)
+	return nil
+}
+
+// RemoveSpot closes opened spot i. It is illegal to remove the last remaining
+// spot (there must always be at least one).
+func (g *Game) RemoveSpot(i int) error {
+	if g.phase != PhaseBetting {
+		return ErrWrongPhase
+	}
+	if len(g.spotBets) <= 1 {
+		return ErrIllegalAction
+	}
+	if i < 0 || i >= len(g.spotBets) {
+		return ErrIllegalAction
+	}
+	g.spotBets = append(g.spotBets[:i], g.spotBets[i+1:]...)
+	return nil
+}
+
+// totalStaked returns the sum of all pending per-spot bets.
+func (g *Game) totalStaked() int {
+	total := 0
+	for _, b := range g.spotBets {
+		total += b
+	}
+	return total
 }
 
 // ---- Deal ----
 
-// Deal starts a round: reshuffles if the cut card was reached, escrows the main
-// bet, deals two cards each, and advances to insurance, player turn, or an
-// immediate resolution (dealer/player natural) as appropriate.
+// Deal starts a round: reshuffles if the cut card was reached, escrows the sum
+// of the pending per-spot bets, deals one hand per spot, and advances to
+// insurance, the player turn, or an immediate resolution (dealer/player
+// naturals) as appropriate.
+//
+// Deal order for N opened spots (left to right): one card to each spot, the
+// dealer up-card, a second card to each spot, the dealer hole card, then all
+// subsequent draws (player hits, then dealer draws) in order. With one spot this
+// reduces to the classic player, dealer-up, player, dealer-hole sequence.
 func (g *Game) Deal() error {
 	if g.phase != PhaseBetting {
 		return ErrWrongPhase
 	}
-	if g.bet < MinBet || g.bet > g.bankroll {
+	for _, b := range g.spotBets {
+		if b < MinBet || b%BetIncrement != 0 {
+			return ErrInvalidBet
+		}
+	}
+	total := g.totalStaked()
+	if total > g.bankroll {
 		return ErrInvalidBet
 	}
 
@@ -371,61 +502,86 @@ func (g *Game) Deal() error {
 	}
 
 	// Reset round state.
-	g.hands = nil
 	g.dealer = Hand{}
 	g.active = 0
 	g.dealerRevealed = false
 	g.dealerBJ = false
-	g.playerNatural = false
-	g.tookInsurance = false
-	g.insuranceBet = 0
-	g.insuranceNet = 0
+	g.insuranceSpot = -1
 
-	// Escrow the main bet (locked decision 4).
-	g.bankroll -= g.bet
-	main := &playerHand{bet: g.bet, outcome: OutcomePending}
+	// Escrow the summed stake (locked decision 4) and create one hand per spot.
+	g.bankroll -= total
+	g.hands = make([]*playerHand, len(g.spotBets))
+	for i, b := range g.spotBets {
+		g.hands[i] = &playerHand{spot: i, bet: b, outcome: OutcomePending}
+	}
 
-	// Deal order: player, dealer up, player, dealer hole.
-	main.hand.add(g.shoe.draw())
+	// Deal order: first card to each spot L->R, dealer up, second card to each
+	// spot L->R, dealer hole.
+	for _, h := range g.hands {
+		h.hand.add(g.shoe.draw())
+	}
 	g.dealer.add(g.shoe.draw())
-	main.hand.add(g.shoe.draw())
+	for _, h := range g.hands {
+		h.hand.add(g.shoe.draw())
+	}
 	g.dealer.add(g.shoe.draw())
 
-	g.hands = []*playerHand{main}
-	g.playerNatural = main.hand.IsBlackjack()
+	// Mark each spot's initial natural (per hand, not a single bool).
+	for _, h := range g.hands {
+		h.natural = h.hand.IsBlackjack()
+	}
 
-	// Insurance is offered only on an Ace up-card and only if affordable.
-	up := g.dealer.Cards[0]
-	if up.Rank == Ace && g.canAfford(g.bet/2) {
-		g.phase = PhaseInsurance
+	// Insurance is offered only on an Ace up-card and only to spots that can
+	// afford it; otherwise proceed straight to the peek.
+	if g.dealer.Cards[0].Rank == Ace {
+		g.advanceInsurance(0)
 		return nil
 	}
 	g.resolvePeek()
 	return nil
 }
 
-// Insurance answers the insurance offer. take=true posts a fixed half-bet side
-// wager (locked decision 1); take=false declines. Either way the dealer then
-// peeks.
+// advanceInsurance moves the insurance offer to the first spot at index >= from
+// that can afford SpotBet(i)/2 against the current bankroll. If none remain, it
+// proceeds to the dealer peek. Affordability is sequential: each taken insurance
+// lowers the bankroll available to later offers.
+func (g *Game) advanceInsurance(from int) {
+	for i := from; i < len(g.hands); i++ {
+		if g.canAfford(g.SpotBet(i) / 2) {
+			g.insuranceSpot = i
+			g.phase = PhaseInsurance
+			return
+		}
+	}
+	g.insuranceSpot = -1
+	g.resolvePeek()
+}
+
+// Insurance answers the insurance offer for the current insurance spot. take=true
+// posts that spot's fixed half-bet side wager (locked decision 1); take=false
+// declines. Either way the offer advances to the next affordable spot, and once
+// none remain the dealer peeks.
 func (g *Game) Insurance(take bool) error {
 	if g.phase != PhaseInsurance {
 		return ErrWrongPhase
 	}
+	i := g.insuranceSpot
+	h := g.hands[i]
 	if take {
-		amt := g.bet / 2
+		amt := g.SpotBet(i) / 2
 		if !g.canAfford(amt) {
 			return ErrIllegalAction
 		}
 		g.bankroll -= amt
-		g.tookInsurance = true
-		g.insuranceBet = amt
+		h.insuranceTaken = true
+		h.insuranceBet = amt
 	}
-	g.resolvePeek()
+	g.advanceInsurance(i + 1)
 	return nil
 }
 
 // resolvePeek performs the dealer peek (on a ten or ace up-card) and routes to
-// the correct next state: dealer blackjack resolution, player-natural payout,
+// the correct next state: dealer blackjack resolution, per-spot natural payouts,
 // or the player's turn.
 func (g *Game) resolvePeek() {
 	up := g.dealer.Cards[0]
@@ -435,56 +591,62 @@ func (g *Game) resolvePeek() {
 		return
 	}
 
-	// Dealer does not have blackjack. Insurance (if taken) is lost.
-	if g.tookInsurance {
-		g.insuranceNet = -g.insuranceBet
+	// Dealer does not have blackjack. Any insurance taken is lost.
+	for _, h := range g.hands {
+		if h.insuranceTaken {
+			h.insuranceNet = -h.insuranceBet
+		}
 	}
 
-	// Player natural auto-resolves, paid 3:2, with no turn (locked decision 2).
-	if g.playerNatural {
-		g.payPlayerNatural()
-		return
+	// Each spot's initial natural auto-resolves, paid 3:2, with no turn
+	// (locked decision 2). Remaining hands go to the player turn.
+	for _, h := range g.hands {
+		if h.natural {
+			g.payNatural(h)
+		}
 	}
 
 	g.phase = PhasePlayerTurn
 	g.resolvePlayerTurn()
 }
 
-// resolveDealerBlackjack settles the round when the dealer has a natural: the
-// player's non-natural hand loses, a player natural pushes, and insurance (if
-// taken) pays 2:1.
+// resolveDealerBlackjack settles the round when the dealer has a natural: every
+// non-natural hand loses, a hand holding a natural pushes, and each taken
+// insurance pays 2:1. (Peek precedes the player turn, so hands equal spots here.)
 func (g *Game) resolveDealerBlackjack() {
 	g.dealerRevealed = true
 	g.dealerBJ = true
 
-	if g.tookInsurance {
-		// Pays 2:1: profit is 2x the stake; stake+profit (3x) returns to bankroll.
-		g.bankroll += g.insuranceBet * 3
-		g.insuranceNet = g.insuranceBet * 2
+	for _, h := range g.hands {
+		if h.insuranceTaken {
+			// Pays 2:1: profit is 2x the stake; stake+profit (3x) returns.
+			g.bankroll += h.insuranceBet * 3
+			h.insuranceNet = h.insuranceBet * 2
+		}
 	}
 
-	h := g.hands[0]
-	if h.hand.IsBlackjack() && !h.fromSplit {
-		// Natural vs natural pushes: stake returned.
-		g.bankroll += h.bet
-		h.outcome = OutcomePush
-		h.net = 0
-	} else {
-		h.outcome = OutcomeLose
-		h.net = -h.bet
+	for _, h := range g.hands {
+		if h.natural {
+			// Natural vs natural pushes: stake returned.
+			g.bankroll += h.bet
+			h.outcome = OutcomePush
+			h.net = 0
+		} else {
+			h.outcome = OutcomeLose
+			h.net = -h.bet
+		}
 	}
 	g.endRound()
 }
 
-// payPlayerNatural pays the player's natural 3:2 and ends the round.
-func (g *Game) payPlayerNatural() {
-	g.dealerRevealed = true
-	h := g.hands[0]
+// payNatural pays a spot's initial natural 3:2 and marks it resolved. It does
+// not reveal the hole card: other spots may still have a turn to play.
+func (g *Game) payNatural(h *playerHand) {
 	profit := h.bet * 3 / 2
 	g.bankroll += h.bet + profit
 	h.outcome = OutcomeBlackjack
 	h.net = profit
-	g.endRound()
+	h.stood = true
 }
 
 // ---- Player actions ----
@@ -539,7 +701,8 @@ func (g *Game) Double() error {
 
 // Split splits an equal-rank pair into two hands, posting an additional bet.
 // Aces are one-and-done (one card each, no hit/double/re-split); non-aces may
-// re-split up to MaxHands. Legal only with sufficient funds (locked decision 3).
+// re-split up to MaxHands hands per spot. Legal only with sufficient funds
+// (locked decision 3).
 func (g *Game) Split() error {
 	if g.phase != PhasePlayerTurn {
 		return ErrWrongPhase
@@ -553,7 +716,8 @@ func (g *Game) Split() error {
 	// Post the additional bet.
 	g.bankroll -= h.bet
 
-	// Move the second card into a brand-new hand inserted right after this one.
+	// Move the second card into a brand-new hand inserted right after this one,
+	// inheriting the parent's originating spot.
 	c1 := h.hand.Cards[1]
 	h.hand.Cards = h.hand.Cards[:1]
 	h.fromSplit = true
@@ -562,6 +726,7 @@ func (g *Game) Split() error {
 
 	newHand := &playerHand{
 		hand:      Hand{Cards: []Card{c1}},
+		spot:      h.spot,
 		bet:       h.bet,
 		fromSplit: true,
 		splitAce:  isAce,
@@ -607,13 +772,15 @@ func (g *Game) resolvePlayerTurn() {
 // ---- Dealer turn & settlement ----
 
 // dealerTurnAndSettle reveals the hole card, plays the dealer out (H17: hits
-// soft 17), and settles every hand.
+// soft 17) when at least one hand is still live, and settles every unresolved
+// hand. Hands resolved at peek (naturals paid 3:2) are skipped.
 func (g *Game) dealerTurnAndSettle() {
 	g.dealerRevealed = true
 
+	// The dealer plays only if some hand is still unresolved and not bust.
 	anyLive := false
 	for _, h := range g.hands {
-		if !h.hand.IsBust() {
+		if h.outcome == OutcomePending && !h.hand.IsBust() {
 			anyLive = true
 			break
 		}
@@ -634,12 +801,16 @@ func (g *Game) dealerTurnAndSettle() {
 	dealerBust := dv > 21
 
 	for _, h := range g.hands {
+		if h.outcome != OutcomePending {
+			continue // already resolved (natural paid at peek)
+		}
 		switch {
 		case h.hand.IsBust():
 			h.outcome = OutcomeLose
 			h.net = -h.bet
 		case h.hand.IsBlackjack() && !h.fromSplit:
-			// Player natural beating a non-blackjack dealer, paid 3:2.
+			// Player natural beating a non-blackjack dealer, paid 3:2. (In
+			// practice naturals resolve at peek; kept for completeness.)
 			profit := h.bet * 3 / 2
 			g.bankroll += h.bet + profit
 			h.outcome = OutcomeBlackjack
@@ -674,8 +845,9 @@ func (g *Game) endRound() {
 }
 
 // NextHand advances from a settled round to the next bet, or to game over if
-// the bankroll can no longer cover the minimum bet. The pending bet is clamped
-// to what the bankroll allows.
+// the bankroll can no longer cover the minimum bet. Betting resets to a single
+// opened spot at the previous round's first bet, clamped to what the bankroll
+// allows.
 func (g *Game) NextHand() error {
 	if g.phase != PhaseRoundOver {
 		return ErrWrongPhase
@@ -684,13 +856,15 @@ func (g *Game) NextHand() error {
 		g.phase = PhaseGameOver
 		return nil
 	}
-	if g.bet > g.bankroll {
+	bet := g.SpotBet(0)
+	if bet > g.bankroll {
 		// Clamp down to the largest affordable multiple of BetIncrement.
-		g.bet = (g.bankroll / BetIncrement) * BetIncrement
-		if g.bet < MinBet {
-			g.bet = MinBet
-		}
+		bet = (g.bankroll / BetIncrement) * BetIncrement
 	}
+	if bet < MinBet {
+		bet = MinBet
+	}
+	g.spotBets = []int{bet}
 	g.phase = PhaseBetting
 	return nil
 }
