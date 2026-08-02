@@ -287,13 +287,17 @@ func (m Model) compact() bool {
 func (m Model) View() string {
 	var b strings.Builder
 	b.WriteString(titleStyle.Render("3:2 Blackjack"))
+	b.WriteString("\n")
+	b.WriteString(m.renderHeader())
 	b.WriteString("\n\n")
 	b.WriteString(m.renderDealerArea())
 	b.WriteString("\n\n")
 	b.WriteString(m.renderPlayerArea())
 	b.WriteString("\n\n")
-	b.WriteString(m.renderStatusBar())
-	b.WriteString("\n")
+	if m.msg != "" {
+		b.WriteString(dimStyle.Render(m.msg))
+		b.WriteString("\n\n")
+	}
 	b.WriteString(m.renderActionBar())
 	b.WriteString("\n")
 
@@ -391,30 +395,17 @@ func (m Model) renderHandFooter(h engine.HandView, roundOver bool) string {
 	return strings.Join(parts, "  ")
 }
 
-func (m Model) renderStatusBar() string {
+// renderHeader shows the player's persistent standing (bankroll) directly under
+// the title, left-aligned. There is no status bar: the current wager lives in the
+// betting control and per-hand footers, and the hand total is shown by the cards
+// themselves. Insurance, when taken, is noted here since it has no other home.
+func (m Model) renderHeader() string {
 	g := m.game
-	segs := []string{
-		"Bankroll " + moneyStyle.Render(fmt.Sprintf("$%d", g.Bankroll())),
-		"Bet " + betStyle.Render(fmt.Sprintf("$%d", g.Bet())),
+	s := "Bankroll " + moneyStyle.Render(fmt.Sprintf("$%d", g.Bankroll()))
+	if g.TookInsurance() && g.Phase() != engine.PhaseBetting {
+		s += "    " + dimStyle.Render(fmt.Sprintf("insurance $%d", g.InsuranceBet()))
 	}
-
-	if g.Phase() == engine.PhasePlayerTurn {
-		hands := g.Player()
-		if i := g.ActiveHandIndex(); i >= 0 && i < len(hands) {
-			h := hands[i]
-			segs = append(segs, "Hand "+describeHandValue(h.Value, h.Soft, h.Blackjack))
-		}
-	}
-
-	if g.TookInsurance() {
-		segs = append(segs, dimStyle.Render(fmt.Sprintf("insurance $%d", g.InsuranceBet())))
-	}
-
-	line := statusBarStyle.Render(strings.Join(segs, "   "))
-	if m.msg != "" {
-		line += "\n" + dimStyle.Render(m.msg)
-	}
-	return line
+	return s
 }
 
 // renderActionBar renders the arrow-navigation menu for the current phase with
@@ -422,32 +413,74 @@ func (m Model) renderStatusBar() string {
 // player's turn the menu is driven directly off engine.LegalActions(), so the UI
 // can never advertise an action the engine would reject.
 func (m Model) renderActionBar() string {
-	var menu, hint string
+	var title, body, hint string
 	switch m.game.Phase() {
 	case engine.PhaseBetting:
-		menu = betStyle.Render(fmt.Sprintf("◀ $%d ▶", m.game.Bet()))
+		title = "Place your bet"
+		body = betStyle.Render(fmt.Sprintf("◀ $%d ▶", m.game.Bet()))
 		hint = fmt.Sprintf("← → $%d · shift+← → $%d · enter deal · q quit", engine.BetIncrement, coarseBetStep)
 	case engine.PhaseInsurance:
+		title = "Insurance"
 		half := m.game.Bet() / 2
-		prompt := dimStyle.Render(fmt.Sprintf("Dealer shows an Ace. Insurance $%d?  ", half))
-		menu = prompt + renderMenu([]string{"Yes", "No"}, clampIdx(m.cursor, 2))
+		body = dimStyle.Render(fmt.Sprintf("Dealer shows an Ace — insure for $%d?", half)) +
+			"\n" + renderMenu([]string{"Yes", "No"}, clampIdx(m.cursor, 2))
 		hint = "← → choose · enter confirm · q quit"
 	case engine.PhasePlayerTurn:
+		title = "Your move"
 		actions := m.playerActions()
 		labels := make([]string, len(actions))
 		for i, a := range actions {
 			labels[i] = actionLabel(a)
 		}
-		menu = renderMenu(labels, clampIdx(m.cursor, len(actions)))
+		body = renderMenu(labels, clampIdx(m.cursor, len(actions)))
 		hint = "← → choose · enter confirm · q quit"
 	case engine.PhaseRoundOver:
-		menu = renderMenu([]string{"Next hand"}, 0)
+		title = "Round over"
+		body = renderMenu([]string{"Next hand"}, 0)
 		hint = "enter continue · q quit"
 	case engine.PhaseGameOver:
-		menu = renderMenu([]string{"Restart", "Quit"}, clampIdx(m.cursor, 2))
+		title = "Game over"
+		body = renderMenu([]string{"Restart", "Quit"}, clampIdx(m.cursor, 2))
 		hint = "← → choose · enter confirm · q quit"
 	}
-	return actionBarStyle.Render(menu + "\n" + dimStyle.Render(hint))
+	return titledBox(title, body) + "\n " + dimStyle.Render(hint)
+}
+
+// titledBox draws a rounded panel around content with a label embedded in the top
+// border. Content may contain ANSI styling and span multiple lines; widths are
+// measured with lipgloss.Width so styled menu pills still align.
+func titledBox(title, content string) string {
+	lines := strings.Split(content, "\n")
+	inner := 0
+	for _, l := range lines {
+		if w := lipgloss.Width(l); w > inner {
+			inner = w
+		}
+	}
+	titleW := lipgloss.Width(title)
+	if need := titleW + 2; need > inner { // keep the title from overflowing the top border
+		inner = need
+	}
+	interior := inner + 2 // one space of padding on each side
+	dashes := interior - (titleW + 3)
+	if dashes < 0 {
+		dashes = 0
+	}
+
+	var sb strings.Builder
+	sb.WriteString(panelBorderStyle.Render("╭─ ") + panelTitleStyle.Render(title) +
+		panelBorderStyle.Render(" "+strings.Repeat("─", dashes)+"╮"))
+	sb.WriteString("\n")
+	for _, l := range lines {
+		pad := inner - lipgloss.Width(l)
+		if pad < 0 {
+			pad = 0
+		}
+		sb.WriteString(panelBorderStyle.Render("│ ") + l + strings.Repeat(" ", pad) +
+			panelBorderStyle.Render(" │") + "\n")
+	}
+	sb.WriteString(panelBorderStyle.Render("╰" + strings.Repeat("─", interior) + "╯"))
+	return sb.String()
 }
 
 // renderMenu lays a set of labels out horizontally, highlighting the selected one

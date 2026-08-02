@@ -68,13 +68,10 @@ var (
 				Border(lipgloss.HiddenBorder()).
 				Padding(0, 1)
 
-	statusBarStyle = lipgloss.NewStyle().
-			Foreground(colorBorder).
-			Background(lipgloss.Color("236")).
-			Padding(0, 1)
-
-	actionBarStyle = lipgloss.NewStyle().
-			Padding(0, 1)
+	// panelBorderStyle / panelTitleStyle draw the rounded action panel and its
+	// embedded title label.
+	panelBorderStyle = lipgloss.NewStyle().Foreground(colorBorder)
+	panelTitleStyle  = lipgloss.NewStyle().Foreground(colorDim)
 
 	// menuSelectedStyle / menuUnselectedStyle render the arrow-navigation menu:
 	// the highlighted item is gold with a dark foreground; the rest are soft white.
