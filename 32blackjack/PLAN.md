@@ -57,6 +57,19 @@ Owner: subagent
 - Update README + SPEC money/controls to match.
 **Gate:** `go build/vet/test` green; engine still UI-agnostic; new frames reviewed.
 
+## Phase 7 — Multi-hand engine (per-spot bets, deal N, per-hand naturals/insurance)  🔨
+Owner: subagent. Spec: `MULTIHAND_SPEC.md` §0–1, §3.
+- MaxSpots=3; per-spot bets + Add/Remove/SetSpotBet; Deal N hands; per-hand naturals;
+  per-spot split cap; per-hand insurance loop; settlement skips resolved naturals.
+- Back-compat Bet()/SetBet on spot 0; all existing engine tests still pass + new §3 tests.
+**Gate:** build/vet/test green; engine UI-agnostic; API reviewed & frozen for UI.
+
+## Phase 8 — Multi-hand UI (bet-tile row, tab switch, add/remove, per-hand insurance)  ⬜
+Owner: subagent (after Phase 7 frozen). Spec: `MULTIHAND_SPEC.md` §2.
+- Betting bet-tile row (1 hand = single tile), Tab/Shift+Tab switch, ←/→ adjust,
+  a add / x(Backspace) remove; per-hand insurance panel; round-net at settlement; overflow.
+**Gate:** build/vet green; frames reviewed by user.
+
 ---
 
 **Phase 6 — APPROVED.** Reviewed by orchestrator: build/vet/test green; engine `game.go` diff
