@@ -428,8 +428,10 @@ func (g *Game) SetSpotBet(i, amount int) error {
 // SetBet sets the pending main bet (opened spot 0), for single-hand back-compat.
 func (g *Game) SetBet(amount int) error { return g.SetSpotBet(0, amount) }
 
-// AddSpot opens an additional betting position at MinBet. It fails if the cap
-// (MaxSpots) is reached or the new total would exceed the bankroll.
+// AddSpot opens an additional betting position, defaulting its bet to the
+// previous (last) hand's bet — clamped down to what the bankroll can still cover,
+// but at least MinBet. It fails if the cap (MaxSpots) is reached or another hand
+// cannot be afforded even at MinBet.
 func (g *Game) AddSpot() error {
 	if g.phase != PhaseBetting {
 		return ErrWrongPhase
@@ -437,10 +439,18 @@ func (g *Game) AddSpot() error {
 	if len(g.spotBets) >= MaxSpots {
 		return ErrIllegalAction
 	}
-	if g.totalStaked()+MinBet > g.bankroll {
+	avail := g.bankroll - g.totalStaked()
+	if avail < MinBet {
 		return ErrInvalidBet
 	}
-	g.spotBets = append(g.spotBets, MinBet)
+	bet := g.spotBets[len(g.spotBets)-1] // default to the previous hand's bet
+	if bet > avail {
+		bet = (avail / BetIncrement) * BetIncrement
+	}
+	if bet < MinBet {
+		bet = MinBet
+	}
+	g.spotBets = append(g.spotBets, bet)
 	return nil
 }
 
@@ -845,9 +855,9 @@ func (g *Game) endRound() {
 }
 
 // NextHand advances from a settled round to the next bet, or to game over if
-// the bankroll can no longer cover the minimum bet. Betting resets to a single
-// opened spot at the previous round's first bet, clamped to what the bankroll
-// allows.
+// the bankroll can no longer cover the minimum bet. Betting carries over the
+// previous round's hands (their count and bets), keeping as many as the bankroll
+// still affords at those bets and always keeping at least one hand.
 func (g *Game) NextHand() error {
 	if g.phase != PhaseRoundOver {
 		return ErrWrongPhase
@@ -856,15 +866,28 @@ func (g *Game) NextHand() error {
 		g.phase = PhaseGameOver
 		return nil
 	}
-	bet := g.SpotBet(0)
-	if bet > g.bankroll {
-		// Clamp down to the largest affordable multiple of BetIncrement.
-		bet = (g.bankroll / BetIncrement) * BetIncrement
+	var next []int
+	total := 0
+	for _, b := range g.spotBets {
+		if b < MinBet {
+			b = MinBet
+		}
+		if total+b > g.bankroll {
+			break // drop this and any later hand we can no longer afford
+		}
+		next = append(next, b)
+		total += b
 	}
-	if bet < MinBet {
-		bet = MinBet
+	if len(next) == 0 {
+		// Even the first hand's previous bet is unaffordable: one hand at the
+		// largest affordable bet (bankroll >= MinBet is guaranteed above).
+		bet := (g.bankroll / BetIncrement) * BetIncrement
+		if bet < MinBet {
+			bet = MinBet
+		}
+		next = []int{bet}
 	}
-	g.spotBets = []int{bet}
+	g.spotBets = next
 	g.phase = PhaseBetting
 	return nil
 }
