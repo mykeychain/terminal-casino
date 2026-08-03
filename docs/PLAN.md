@@ -14,7 +14,7 @@ Status legend: ⬜ not started · 🔨 in progress · 🔎 in review · ✅ done
 # Part 1 — Casino SSH server + repo reorg (v2.0). Spec: `docs/PART1_SSH_SPEC.md`.
 New module path: `github.com/mykeychain/terminal-casino`.
 
-## P1.1 — Repo reorg (root module, relocate packages, docs → docs/)  🔨
+## P1.1 — Repo reorg (root module, relocate packages, docs → docs/)  ✅
 Owner: subagent.
 - go.mod → root, module `github.com/mykeychain/terminal-casino`; `32blackjack/internal/engine`
   → `internal/blackjack32/engine`; `internal/ui` → `internal/blackjack32/ui`;

@@ -8,8 +8,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/mykeychain/terminal-casino/32blackjack/internal/engine"
-	"github.com/mykeychain/terminal-casino/32blackjack/internal/ui"
+	"github.com/mykeychain/terminal-casino/internal/blackjack32/engine"
+	"github.com/mykeychain/terminal-casino/internal/blackjack32/ui"
 )
 
 func main() {

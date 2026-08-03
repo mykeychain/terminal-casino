@@ -1,4 +1,4 @@
-module github.com/mykeychain/terminal-casino/32blackjack
+module github.com/mykeychain/terminal-casino
 
 go 1.24.7
 

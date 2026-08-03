@@ -5,7 +5,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/mykeychain/terminal-casino/32blackjack/internal/engine"
+	"github.com/mykeychain/terminal-casino/internal/blackjack32/engine"
 )
 
 // padRight returns s padded with spaces on the right to `width` display cells.

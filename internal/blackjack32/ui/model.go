@@ -7,7 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/mykeychain/terminal-casino/32blackjack/internal/engine"
+	"github.com/mykeychain/terminal-casino/internal/blackjack32/engine"
 )
 
 // compactWidthThreshold: below this terminal width, or with more than two hands,
