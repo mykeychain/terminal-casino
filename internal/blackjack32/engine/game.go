@@ -98,11 +98,11 @@ func (a Action) String() string {
 type Outcome int
 
 const (
-	OutcomePending Outcome = iota
-	OutcomeWin              // ordinary win, paid 1:1
-	OutcomeLose             // loss
-	OutcomePush             // tie, stake returned
-	OutcomeBlackjack        // player natural, paid 3:2
+	OutcomePending   Outcome = iota
+	OutcomeWin               // ordinary win, paid 1:1
+	OutcomeLose              // loss
+	OutcomePush              // tie, stake returned
+	OutcomeBlackjack         // player natural, paid 3:2
 )
 
 // String returns the outcome name.

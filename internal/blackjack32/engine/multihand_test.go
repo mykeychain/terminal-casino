@@ -80,8 +80,8 @@ func TestMultiSpotMixedSettlement(t *testing.T) {
 	//   s2 = 10,6 = 16 => lose
 	g := NewGameWithShoe(1000, stack(
 		Ten, Ten, Ten, // first card each
-		Ten,               // dealer up
-		Nine, Seven, Six,  // second card each
+		Ten,              // dealer up
+		Nine, Seven, Six, // second card each
 		Seven, // dealer hole => 10,7 = 17 stands
 	))
 	setupSpots(t, g, 10, 10, 10)
@@ -122,7 +122,7 @@ func TestMultiSpotNaturalPaidWhileOtherPlays(t *testing.T) {
 	//   s1 = 10,6 = 16 => plays; dealer 6,10=16 hits 10 => 26 bust => s1 wins
 	g := NewGameWithShoe(1000, stack(
 		Ace, Ten, // first card each
-		Six,      // dealer up
+		Six,       // dealer up
 		King, Six, // second card each
 		Ten, // dealer hole => 6,10 = 16
 		Ten, // dealer hit => bust
@@ -297,7 +297,7 @@ func TestPerHandInsuranceDealerNoBlackjackLoses(t *testing.T) {
 	// it; the hands then play on.
 	g := NewGameWithShoe(1000, stack(
 		Ten, Ten, // first card each
-		Ace,        // dealer up
+		Ace,         // dealer up
 		Nine, Eight, // second card each
 		Six, // dealer hole => A,6 soft 17
 		Ten, // dealer hits soft 17 => 17 hard, stands
