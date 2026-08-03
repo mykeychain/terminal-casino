@@ -33,9 +33,11 @@ func main() {
 	hostKey := flag.String("host-key", ".ssh/casino_ed25519", "path to the SSH host key (generated if absent)")
 	flag.Parse()
 
-	// Fixed server-wide color profile (locked decision 5): every client renders the
-	// designed palette. Package-global styles stay as-is; no per-session renderer.
-	lipgloss.SetColorProfile(termenv.TrueColor)
+	// Fixed server-wide color profile: ANSI256 is universally supported (including
+	// macOS Terminal.app, which mis-renders 24-bit truecolor) and is the reliable
+	// choice over SSH, where the truecolor hint is usually not forwarded. Lip Gloss
+	// downsamples the hex palette to the nearest 256-color for every client.
+	lipgloss.SetColorProfile(termenv.ANSI256)
 
 	srv, err := wish.NewServer(
 		wish.WithAddress(*addr),

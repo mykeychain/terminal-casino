@@ -8,8 +8,6 @@ import (
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
 
 	"github.com/mykeychain/terminal-casino/internal/blackjack32"
 	"github.com/mykeychain/terminal-casino/internal/casino"
@@ -17,10 +15,10 @@ import (
 )
 
 func main() {
-	// Pin the color profile once so styling is stable regardless of the local
-	// terminal's advertised capabilities (locked decision 5: server-wide
-	// TrueColor).
-	lipgloss.SetColorProfile(termenv.TrueColor)
+	// Locally, let Lip Gloss auto-detect the terminal's color capability from its
+	// stdout. Forcing TrueColor breaks terminals that only do 256 colors (e.g.
+	// macOS Terminal.app renders 24-bit sequences as garbage); auto-detect
+	// downsamples the palette correctly for whatever terminal is attached.
 
 	games := []game.Game{
 		blackjack32.Game(),
