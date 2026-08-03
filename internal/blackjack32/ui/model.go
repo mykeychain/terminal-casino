@@ -594,7 +594,11 @@ func (m Model) renderHandBlock(idx int, h engine.HandView, multi, roundOver bool
 		inner = inner + "\n" + footer
 	}
 
-	if h.Active {
+	// Highlight the active hand during play, and the hand currently being offered
+	// insurance during the per-hand insurance step, so the decision's hand is clear.
+	highlight := h.Active ||
+		(m.game.Phase() == engine.PhaseInsurance && h.Spot == m.game.InsuranceSpot())
+	if highlight {
 		return activeHandStyle.Render(inner)
 	}
 	return inactiveHandStyle.Render(inner)
@@ -652,7 +656,9 @@ func (m Model) renderActionBar() string {
 		handNo := spot + 1
 		half := m.game.SpotBet(spot) / 2
 		title = fmt.Sprintf("Insurance · Hand %d", handNo)
-		body = dimStyle.Render(fmt.Sprintf("Dealer shows an Ace — insure Hand %d for $%d?", handNo, half)) +
+		body = dimStyle.Render(fmt.Sprintf("Dealer shows an Ace — insure Hand %d for ", handNo)) +
+			insuranceCostStyle.Render(fmt.Sprintf(" $%d ", half)) +
+			dimStyle.Render(" ?") +
 			"\n" + renderMenu([]string{"Yes", "No"}, clampIdx(m.cursor, 2))
 		hint = "← → choose · enter confirm · q quit"
 	case engine.PhasePlayerTurn:

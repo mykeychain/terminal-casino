@@ -118,4 +118,8 @@ var (
 
 	moneyStyle = lipgloss.NewStyle().Bold(true).Foreground(colorGreen)
 	betStyle   = lipgloss.NewStyle().Bold(true).Foreground(colorFocus)
+
+	// insuranceCostStyle highlights the insurance cost in the prompt (gold pill:
+	// gold background, dark text) so the money on the line stands out.
+	insuranceCostStyle = lipgloss.NewStyle().Bold(true).Foreground(colorMenuFg).Background(colorFocus)
 )
