@@ -382,9 +382,9 @@ func (m Model) View() string {
 	b.WriteString(titleStyle.Render("3:2 Blackjack"))
 	b.WriteString("\n")
 	b.WriteString(m.renderHeader())
-	b.WriteString("\n\n")
+	b.WriteString("\n")
 	b.WriteString(m.renderDealerArea(f))
-	b.WriteString("\n\n")
+	b.WriteString("\n")
 	b.WriteString(m.renderPlayerArea(f))
 	b.WriteString("\n\n")
 	if f.showBanner {
