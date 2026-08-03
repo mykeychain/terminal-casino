@@ -22,8 +22,12 @@ go run ./cmd/casino-ssh          # listens on :23234
 ssh -p 23234 localhost           # lands in the lobby
 ```
 
-Flags: `-addr` (listen address, or env `CASINO_SSH_ADDR`; default `:23234`) and
-`-host-key` (path, generated on first run; default `.ssh/casino_ed25519`).
+Flags (each also settable via a `CASINO_SSH_*` env var): `-addr` (listen address,
+env `CASINO_SSH_ADDR`, default `:23234`), `-host-key` (path, generated on first run,
+default `.ssh/casino_ed25519`), `-idle-timeout` (reap idle sessions, default `15m`,
+`0` disables), and `-max-sessions` (concurrent-session cap with a "full" message,
+default `50`, `0` = unlimited). Connects/disconnects are logged with the live session
+count and duration.
 Ctrl+C stops it gracefully.
 
 ---
@@ -158,5 +162,8 @@ Map `-p 22:23234` for the default port (the host must not already use 22).
 - Keep the **admin SSH** port (2222) restricted to your own IP in the firewall.
 - The **host key persists** (`/var/lib/terminal-casino/`), so returning players don't
   get "host key changed" warnings.
-- Before heavy public exposure, consider the Part 1 follow-up (idle-session timeout,
-  max-concurrent-session cap, structured logging) — tracked in `docs/PART1_SSH_SPEC.md`.
+- **Abuse limits are built in.** Idle sessions are reaped after 15m and concurrent
+  sessions are capped at 50 by default (over-cap connections get a "casino is full"
+  message). Tune both with `-idle-timeout` / `-max-sessions` (or the `CASINO_SSH_*`
+  env vars) — see the flags in §2. Connects/disconnects are logged with the live
+  session count and duration (`journalctl -u casino-ssh`).

@@ -27,9 +27,14 @@ go run ./cmd/casino-ssh            # listens on :23234 by default
 ssh -p 23234 localhost
 ```
 
-Server flags: `-addr` (listen address, or `CASINO_SSH_ADDR`; default `:23234`) and
-`-host-key` (path to the SSH host key, generated on first run; default `.ssh/casino_ed25519`).
-Stop the server with Ctrl+C — it shuts down gracefully.
+Server flags (each also settable via a `CASINO_SSH_*` env var):
+- `-addr` — listen address (env `CASINO_SSH_ADDR`; default `:23234`).
+- `-host-key` — SSH host key path, generated on first run (default `.ssh/casino_ed25519`).
+- `-idle-timeout` — disconnect a session after this long with no input (env `CASINO_SSH_IDLE_TIMEOUT`; default `15m`; `0` disables).
+- `-max-sessions` — max concurrent sessions; further connections get a "casino is full" message (env `CASINO_SSH_MAX_SESSIONS`; default `50`; `0` = unlimited).
+
+Each connect/disconnect is logged with the live session count and duration. Stop the
+server with Ctrl+C — it shuts down gracefully.
 
 Run the tests:
 
