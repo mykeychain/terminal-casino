@@ -46,13 +46,35 @@ type Model struct {
 
 	// msg is a transient status line (e.g. rejected bet, reshuffle notice).
 	msg string
+
+	// ---- Feel-tier animation sub-state (independent of the engine Phase) ----
+	// While animState != animIdle an animation is playing: input is gated and the
+	// View renders from the reveal counters below instead of straight from the
+	// engine. The engine remains the source of truth for the final state; these
+	// fields only control when each piece of it becomes visible.
+	animState animState
+
+	// dealShown counts revealed positions during the initial deal cascade
+	// (see dealPositions / frame). dealerShown counts dealer cards drawn face up
+	// during the dealer reveal; holeFlipped records that the hole card is face up.
+	dealShown   int
+	dealerShown int
+	holeFlipped bool
+
+	// displayBankroll is the bankroll shown in the header. It is frozen at the
+	// pre-deal value for the duration of a round (masking the escrow) and ticks
+	// to the settled bankroll during the result effect, so its delta equals the
+	// round's net. bankFrom / bankStep drive that count-up.
+	displayBankroll int
+	bankFrom        int
+	bankStep        int
 }
 
 // New builds a Model over an already-constructed game. newGame is invoked to get
 // a fresh, freshly-seeded game when the player restarts after game over; keeping
 // the time seed in the caller preserves the engine's injected-RNG contract.
 func New(game *engine.Game, newGame func() *engine.Game) Model {
-	return Model{game: game, newGame: newGame}
+	return Model{game: game, newGame: newGame, displayBankroll: game.Bankroll()}
 }
 
 // Init implements tea.Model. No initial command is needed.
@@ -68,6 +90,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		return m.handleKey(msg)
 	}
+	if mm, cmd, handled := m.updateAnim(msg); handled {
+		return mm, cmd
+	}
 	return m, nil
 }
 
@@ -77,6 +102,12 @@ func (m Model) handleKey(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Global quit.
 	if key == "q" || key == "ctrl+c" {
 		return m, tea.Quit
+	}
+
+	// Input is locked while an animation runs (locked decision 3). Keys other
+	// than quit are ignored, not queued.
+	if m.animState != animIdle {
+		return m, nil
 	}
 
 	switch m.game.Phase() {
@@ -151,14 +182,19 @@ func (m Model) handleBetting(key string) (tea.Model, tea.Cmd) {
 			m.msg = ""
 		}
 	case "enter", " ":
+		// Snapshot the bankroll before Deal escrows the stake; the deal reveal
+		// holds this value in the header so it does not visibly drop, and it
+		// becomes the start of the result count-up.
+		pre := m.game.Bankroll()
 		if err := m.game.Deal(); err != nil {
 			m.msg = "cannot deal: " + err.Error()
-		} else {
-			m.msg = ""
-			if m.game.DidReshuffle() {
-				m.msg = "Shoe reshuffled."
-			}
+			return m, nil
 		}
+		m.msg = ""
+		if m.game.DidReshuffle() {
+			m.msg = "Shoe reshuffled."
+		}
+		return m.startDealReveal(pre)
 	}
 	return m, nil
 }
@@ -210,8 +246,12 @@ func (m Model) handleInsurance(key string) (tea.Model, tea.Cmd) {
 			m.cursor++
 		}
 	case "enter", " ":
+		// Answering insurance can settle the round (dealer blackjack on peek);
+		// displayBankroll already holds the pre-deal snapshot, so afterAction
+		// can start the dealer reveal + result if the round is now over.
 		_ = m.game.Insurance(m.cursor == 0)
 		m.msg = ""
+		return m.afterAction()
 	}
 	return m, nil
 }
@@ -251,9 +291,14 @@ func (m Model) handlePlayerTurn(key string) (tea.Model, tea.Cmd) {
 		}
 		if err != nil {
 			m.msg = a.String() + ": " + err.Error()
-		} else {
-			m.msg = ""
+			return m, nil
 		}
+		m.msg = ""
+		// Hit/Double reveal their card instantly (no per-card animation), but if
+		// the action settled the round the dealer reveal + result play out.
+		// displayBankroll still holds the pre-deal value, so it is the correct
+		// pre-settlement start for the count-up.
+		return m.afterAction()
 	}
 	return m, nil
 }
@@ -286,6 +331,7 @@ func (m Model) handleRoundOver(key string) (tea.Model, tea.Cmd) {
 		} else {
 			m.msg = ""
 			m.focusedSpot = 0
+			m.displayBankroll = m.game.Bankroll()
 		}
 	}
 	return m, nil
@@ -310,6 +356,8 @@ func (m Model) handleGameOver(key string) (tea.Model, tea.Cmd) {
 			m.cursor = 0
 			m.focusedSpot = 0
 			m.msg = ""
+			m.animState = animIdle
+			m.displayBankroll = m.game.Bankroll()
 		} else {
 			return m, tea.Quit
 		}
@@ -329,21 +377,30 @@ func (m Model) compact() bool {
 
 // View implements tea.Model.
 func (m Model) View() string {
+	f := m.frame()
 	var b strings.Builder
 	b.WriteString(titleStyle.Render("3:2 Blackjack"))
 	b.WriteString("\n")
 	b.WriteString(m.renderHeader())
 	b.WriteString("\n\n")
-	b.WriteString(m.renderDealerArea())
+	b.WriteString(m.renderDealerArea(f))
 	b.WriteString("\n\n")
-	b.WriteString(m.renderPlayerArea())
+	b.WriteString(m.renderPlayerArea(f))
 	b.WriteString("\n\n")
-	if m.msg != "" {
-		b.WriteString(dimStyle.Render(m.msg))
+	if f.showBanner {
+		b.WriteString(m.renderBanner())
 		b.WriteString("\n\n")
 	}
-	b.WriteString(m.renderActionBar())
-	b.WriteString("\n")
+	// The transient status line and the action bar/prompt are hidden mid-animation
+	// (controls unlock only when idle).
+	if f.showControls {
+		if m.msg != "" {
+			b.WriteString(dimStyle.Render(m.msg))
+			b.WriteString("\n\n")
+		}
+		b.WriteString(m.renderActionBar())
+		b.WriteString("\n")
+	}
 
 	out := b.String()
 	if m.width > 0 {
@@ -352,38 +409,49 @@ func (m Model) View() string {
 	return out
 }
 
-func (m Model) renderDealerArea() string {
+func (m Model) renderDealerArea(f revealFrame) string {
 	dv := m.game.Dealer()
 	label := areaLabelStyle.Render("Dealer")
 
 	var status string
 	switch {
-	case len(dv.Cards) == 0:
+	case f.dealerCards == 0:
 		status = dimStyle.Render("waiting for deal")
-	case !dv.Revealed:
-		status = dimStyle.Render(fmt.Sprintf("showing %d", dv.Value))
-	default:
+	case f.dealerFaceUp <= 1:
+		// Only the up-card is face up (hole still hidden): report the up-card.
+		status = dimStyle.Render(fmt.Sprintf("showing %d", dv.Upcard.Value()))
+	case f.showOutcomes:
+		// Whole dealer hand revealed and the round is settled: show its verdict.
 		status = describeHandValue(dv.Value, dv.Soft, dv.Blackjack)
+	default:
+		// Mid-reveal (hole flipped, dealer still drawing): show the running total
+		// of the revealed cards so it climbs — and busts — as each draw lands.
+		rv := engine.Hand{Cards: dv.Cards[:f.dealerFaceUp]}
+		status = describeHandValue(rv.Value(), rv.IsSoft(), false)
 	}
 
-	if len(dv.Cards) == 0 {
+	if f.dealerCards == 0 {
 		return label + "  " + status
 	}
-	cards := renderDealerHand(dv, m.compact())
+	cards := renderDealerHandFrame(dv, f, m.compact())
 	return label + "  " + status + "\n" + cards
 }
 
-func (m Model) renderPlayerArea() string {
+func (m Model) renderPlayerArea(f revealFrame) string {
 	label := areaLabelStyle.Render("You")
 	hands := m.game.Player()
 	if len(hands) == 0 {
 		return label + "  " + dimStyle.Render("place your bet")
 	}
 
-	roundOver := m.game.Phase() == engine.PhaseRoundOver
+	roundOver := f.showOutcomes
 	blocks := make([]string, len(hands))
 	for i, h := range hands {
-		blocks[i] = m.renderHandBlock(i, h, len(hands) > 1, roundOver)
+		count := len(h.Cards)
+		if i < len(f.playerCards) {
+			count = f.playerCards[i]
+		}
+		blocks[i] = m.renderHandBlock(i, h, len(hands) > 1, roundOver, count)
 	}
 	handsRow := lipgloss.JoinHorizontal(lipgloss.Top, blocks...)
 	// Overflow: if the horizontal row of hand blocks would exceed the terminal
@@ -416,7 +484,7 @@ func renderRoundNet(net int) string {
 // renderHandBlock renders one player hand: a caption, the cards, and a footer
 // with value/bet (and outcome once the round is over). The active hand gets a
 // highlighted border; others get an equal-size invisible border so nothing jumps.
-func (m Model) renderHandBlock(idx int, h engine.HandView, multi, roundOver bool) string {
+func (m Model) renderHandBlock(idx int, h engine.HandView, multi, roundOver bool, count int) string {
 	var caption string
 	if multi {
 		caption = fmt.Sprintf("Hand %d", idx+1)
@@ -427,9 +495,12 @@ func (m Model) renderHandBlock(idx int, h engine.HandView, multi, roundOver bool
 		caption = keyHintStyle.Render("◀ active")
 	}
 
-	cards := renderHand(h.Cards, m.compact())
+	cards := renderHandCount(h.Cards, count, m.compact())
 
-	footer := m.renderHandFooter(h, roundOver)
+	// Show the hand total only once every card in this hand is on the table, so
+	// the deal cascade does not spoil a not-yet-complete total.
+	showValue := count > 0 && count >= len(h.Cards)
+	footer := m.renderHandFooter(h, roundOver, showValue)
 
 	inner := cards
 	if caption != "" {
@@ -445,11 +516,15 @@ func (m Model) renderHandBlock(idx int, h engine.HandView, multi, roundOver bool
 	return inactiveHandStyle.Render(inner)
 }
 
-func (m Model) renderHandFooter(h engine.HandView, roundOver bool) string {
+func (m Model) renderHandFooter(h engine.HandView, roundOver, showValue bool) string {
 	// The value column shows the hand total; the outcome column owns the verdict
 	// word. Suppress the "Blackjack!" label here once the round is settled so it
-	// isn't printed twice (value slot + outcome slot).
-	parts := []string{describeHandValue(h.Value, h.Soft, h.Blackjack && !roundOver)}
+	// isn't printed twice (value slot + outcome slot). During the deal cascade the
+	// value is hidden entirely until the hand is complete.
+	var parts []string
+	if showValue {
+		parts = append(parts, describeHandValue(h.Value, h.Soft, h.Blackjack && !roundOver))
+	}
 	parts = append(parts, betStyle.Render(fmt.Sprintf("$%d", h.Bet)))
 	if h.Doubled {
 		parts = append(parts, dimStyle.Render("doubled"))
@@ -469,7 +544,9 @@ func (m Model) renderHandFooter(h engine.HandView, roundOver bool) string {
 // themselves. Insurance, when taken, is noted here since it has no other home.
 func (m Model) renderHeader() string {
 	g := m.game
-	s := "Bankroll " + moneyStyle.Render(fmt.Sprintf("$%d", g.Bankroll()))
+	// The header shows displayBankroll, which the feel tier animates; when idle it
+	// equals g.Bankroll().
+	s := "Bankroll " + moneyStyle.Render(fmt.Sprintf("$%d", m.displayBankroll))
 	if g.TookInsurance() && g.Phase() != engine.PhaseBetting {
 		s += "    " + dimStyle.Render(fmt.Sprintf("insurance $%d", g.InsuranceBet()))
 	}

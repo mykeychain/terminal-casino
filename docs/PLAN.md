@@ -114,7 +114,12 @@ clamped/reset by menu signature — no game logic in UI. Fresh frames sent for u
 
 # Polish — Feel tier (v2.1). Spec: `docs/FEELTIER_SPEC.md`. UI-only, engine untouched.
 
-## FT.1 — Deal/dealer animation + result juice + bankroll tick  🔨
+## FT.1 — Deal/dealer animation + result juice + bankroll tick  ✅
+Reviewed: build/vet/test green, only ui/ changed, engine+lobby untouched; anim state machine
+read (input gating, bankroll snapshot-before-settle, view driven off revealFrame). Orchestrator
+fixes on top: dealer draws appear one-at-a-time (no premature backs), and the dealer header
+shows the revealed total climbing (16→bust) instead of a stale "showing 9". Frame sequence
+captured & sent.
 Owner: subagent. Animate deal reveal, dealer play (UI-revealed, suspense), result banner +
 bankroll count; input locked during anim; player hits stay instant.
 **Gate:** build/vet/test green; engine untouched; frame-sequence reviewed by orchestrator.

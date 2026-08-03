@@ -97,25 +97,35 @@ func joinCards(cards []string, compact bool) string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, parts...)
 }
 
-// renderHand lays out a player hand as side-by-side face-up cards.
-func renderHand(cards []engine.Card, compact bool) string {
-	boxes := make([]string, len(cards))
-	for i, c := range cards {
-		boxes[i] = renderCard(c)
+// renderHandCount lays out the first `count` cards of a player hand as
+// side-by-side face-up cards. The feel tier passes a count below len(cards) so
+// the initial deal can cascade in one card at a time.
+func renderHandCount(cards []engine.Card, count int, compact bool) string {
+	if count > len(cards) {
+		count = len(cards)
+	}
+	if count < 0 {
+		count = 0
+	}
+	boxes := make([]string, count)
+	for i := 0; i < count; i++ {
+		boxes[i] = renderCard(cards[i])
 	}
 	return joinCards(boxes, compact)
 }
 
-// renderDealerHand lays out the dealer hand. While the hole card is hidden, the
-// up-card is shown face up and every other card is a face-down back.
-func renderDealerHand(dv engine.DealerView, compact bool) string {
-	boxes := make([]string, 0, len(dv.Cards))
-	for i, c := range dv.Cards {
-		if !dv.Revealed && i > 0 {
+// renderDealerHandFrame lays out the dealer hand from a revealFrame: slots
+// [0,dealerFaceUp) are drawn face up and the remaining drawn slots (up to
+// dealerCards) are face-down backs. This drives both the deal cascade (hole as a
+// back) and the dealer reveal (hole flips, draws appear one at a time).
+func renderDealerHandFrame(dv engine.DealerView, f revealFrame, compact bool) string {
+	boxes := make([]string, 0, f.dealerCards)
+	for i := 0; i < f.dealerCards && i < len(dv.Cards); i++ {
+		if i < f.dealerFaceUp {
+			boxes = append(boxes, renderCard(dv.Cards[i]))
+		} else {
 			boxes = append(boxes, renderCardBack())
-			continue
 		}
-		boxes = append(boxes, renderCard(c))
 	}
 	return joinCards(boxes, compact)
 }
