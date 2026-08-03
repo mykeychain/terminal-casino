@@ -375,41 +375,115 @@ func (m Model) compact() bool {
 	return m.width > 0 && m.width < compactWidthThreshold
 }
 
-// View implements tea.Model.
+// View implements tea.Model. It composes the screen as three anchored zones —
+// a fixed top (title + bankroll header), a fixed bottom (result banner + control
+// panel), and a flexible middle (the table) that fills the remaining rows — sized
+// to exactly m.height × m.width so the title never scrolls off the top and the
+// controls are always pinned to the bottom. Before the first WindowSizeMsg
+// (m.width/m.height == 0) it falls back to simple top-to-bottom stacking.
 func (m Model) View() string {
 	f := m.frame()
+	if m.width == 0 || m.height == 0 {
+		return m.viewStacked(f)
+	}
+
+	top := m.renderTop()
+	bottom := m.renderBottom(f)
+	topH := lipgloss.Height(top)
+	bottomH := lipgloss.Height(bottom)
+	middleH := m.height - topH - bottomH
+	if middleH < 0 {
+		middleH = 0
+	}
+
+	// Height-aware density: render the table at full density; if it does not fit
+	// the middle region, drop to compact (3-row) cards. If compact still overflows,
+	// fitHeight clips the middle (never the chrome, which lives in top/bottom).
+	middle := m.renderTable(f, false)
+	if lipgloss.Height(middle) > middleH {
+		middle = m.renderTable(f, true)
+	}
+	middleRegion := fitHeight(middle, middleH)
+
+	body := lipgloss.JoinVertical(lipgloss.Left, top, middleRegion, bottom)
+	// Guard: force exact terminal height even if the chrome alone exceeds it (a
+	// terminal too short for the panels — the min-size guard is out of scope).
+	body = fitHeight(body, m.height)
+	return lipgloss.NewStyle().Width(m.width).Render(body)
+}
+
+// viewStacked is the pre-size fallback: the original top-to-bottom concatenation,
+// used only before the first WindowSizeMsg arrives (no known width/height).
+func (m Model) viewStacked(f revealFrame) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("3:2 Blackjack"))
+	b.WriteString(m.renderTop())
 	b.WriteString("\n")
-	b.WriteString(m.renderHeader())
+	b.WriteString(m.renderTable(f, false))
 	b.WriteString("\n")
-	b.WriteString(m.renderDealerArea(f))
-	b.WriteString("\n")
-	b.WriteString(m.renderPlayerArea(f))
-	b.WriteString("\n\n")
+	bottom := m.renderBottom(f)
+	if bottom != "" {
+		b.WriteString("\n")
+		b.WriteString(bottom)
+	}
+	return b.String()
+}
+
+// renderTop builds the fixed top zone: the title, pinned to row 0, and the
+// bankroll header directly beneath it.
+func (m Model) renderTop() string {
+	return titleStyle.Render("3:2 Blackjack") + "\n" + m.renderHeader()
+}
+
+// renderTable builds the flexible middle zone — the dealer area stacked over the
+// player area — at the requested vertical density (short = compact 3-row cards).
+func (m Model) renderTable(f revealFrame, short bool) string {
+	return lipgloss.JoinVertical(lipgloss.Left,
+		m.renderDealerArea(f, short),
+		m.renderPlayerArea(f, short),
+	)
+}
+
+// renderBottom builds the fixed bottom zone: the result banner (when shown), the
+// transient status line, and the phase's control panel + hint. Everything here is
+// pinned to the bottom of the frame. It is empty mid-animation, when neither the
+// banner nor the controls are shown.
+func (m Model) renderBottom(f revealFrame) string {
+	var parts []string
 	if f.showBanner {
-		b.WriteString(m.renderBanner())
-		b.WriteString("\n\n")
+		parts = append(parts, m.renderBanner())
 	}
 	// The transient status line and the action bar/prompt are hidden mid-animation
 	// (controls unlock only when idle).
 	if f.showControls {
 		if m.msg != "" {
-			b.WriteString(dimStyle.Render(m.msg))
-			b.WriteString("\n\n")
+			parts = append(parts, dimStyle.Render(m.msg))
 		}
-		b.WriteString(m.renderActionBar())
-		b.WriteString("\n")
+		parts = append(parts, m.renderActionBar())
 	}
-
-	out := b.String()
-	if m.width > 0 {
-		out = lipgloss.NewStyle().Width(m.width).Render(out)
+	if len(parts) == 0 {
+		return ""
 	}
-	return out
+	return lipgloss.JoinVertical(lipgloss.Left, parts...)
 }
 
-func (m Model) renderDealerArea(f revealFrame) string {
+// fitHeight pads s with blank lines (top-aligned) up to h rows, or clips it to
+// the first h rows when it is taller. It is how the middle region is sized to the
+// flex space and how the whole frame is forced to exactly m.height.
+func fitHeight(s string, h int) string {
+	if h <= 0 {
+		return ""
+	}
+	lines := strings.Split(s, "\n")
+	if len(lines) > h {
+		lines = lines[:h]
+	}
+	for len(lines) < h {
+		lines = append(lines, "")
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (m Model) renderDealerArea(f revealFrame, short bool) string {
 	dv := m.game.Dealer()
 	label := areaLabelStyle.Render("Dealer")
 
@@ -435,12 +509,13 @@ func (m Model) renderDealerArea(f revealFrame) string {
 		return label + "  " + status
 	}
 	// Reserve a fixed-height card row so the layout doesn't jump as the dealer's
-	// cards cascade in — the row is blank space until the up-card lands.
-	cards := lipgloss.NewStyle().Height(cardHeight).Render(renderDealerHandFrame(dv, f, m.compact()))
+	// cards cascade in — the row is blank space until the up-card lands. The row
+	// height tracks the chosen density (5 rows full, 3 rows compact).
+	cards := lipgloss.NewStyle().Height(cardHeightFor(short)).Render(renderDealerHandFrame(dv, f, m.compact(), short))
 	return label + "  " + status + "\n" + cards
 }
 
-func (m Model) renderPlayerArea(f revealFrame) string {
+func (m Model) renderPlayerArea(f revealFrame, short bool) string {
 	label := areaLabelStyle.Render("You")
 	hands := m.game.Player()
 	if len(hands) == 0 {
@@ -454,7 +529,7 @@ func (m Model) renderPlayerArea(f revealFrame) string {
 		if i < len(f.playerCards) {
 			count = f.playerCards[i]
 		}
-		blocks[i] = m.renderHandBlock(i, h, len(hands) > 1, roundOver, count)
+		blocks[i] = m.renderHandBlock(i, h, len(hands) > 1, roundOver, count, short)
 	}
 	handsRow := lipgloss.JoinHorizontal(lipgloss.Top, blocks...)
 	// Overflow: if the horizontal row of hand blocks would exceed the terminal
@@ -487,7 +562,7 @@ func renderRoundNet(net int) string {
 // renderHandBlock renders one player hand: a caption, the cards, and a footer
 // with value/bet (and outcome once the round is over). The active hand gets a
 // highlighted border; others get an equal-size invisible border so nothing jumps.
-func (m Model) renderHandBlock(idx int, h engine.HandView, multi, roundOver bool, count int) string {
+func (m Model) renderHandBlock(idx int, h engine.HandView, multi, roundOver bool, count int, short bool) string {
 	// No "active" caption: the highlighted (gold) border already marks the active
 	// hand. Multi-hand rounds keep a "Hand N" label to identify the spots.
 	var caption string
@@ -497,7 +572,7 @@ func (m Model) renderHandBlock(idx int, h engine.HandView, multi, roundOver bool
 
 	// Reserve a fixed-height card row so a hand block keeps its height as its cards
 	// cascade in (blank until the first card lands), preventing vertical jumping.
-	cards := lipgloss.NewStyle().Height(cardHeight).Render(renderHandCount(h.Cards, count, m.compact()))
+	cards := lipgloss.NewStyle().Height(cardHeightFor(short)).Render(renderHandCount(h.Cards, count, m.compact(), short))
 
 	// Show the hand total only once every card in this hand is on the table, so
 	// the deal cascade does not spoil a not-yet-complete total.

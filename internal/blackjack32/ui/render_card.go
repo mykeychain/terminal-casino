@@ -45,30 +45,48 @@ func rankField(r engine.Rank, right bool) string {
 	return padRight(label, rankFieldWidth)
 }
 
-// renderCard renders a single face-up card as a 3-line body wrapped in a rounded
-// border: rank in the top-left AND bottom-right (fixed 2-char field) with a
-// centered suit. Every card shares the same soft-white border; only the rank
-// text and suit glyph are tinted — red for hearts/diamonds, soft white for
-// spades/clubs.
-func renderCard(c engine.Card) string {
-	top := padRight(rankField(c.Rank, false), cardInnerWidth)
-	mid := center(c.Suit.String(), cardInnerWidth)
-	bot := padLeft(rankField(c.Rank, true), cardInnerWidth)
-	body := strings.Join([]string{top, mid, bot}, "\n")
+// cardHeightFor reports the rendered card height for the chosen vertical density:
+// the full 5-row card, or the 3-row compact card. Callers use it to size the
+// reserved (fixed-height) card rows so the layout does not jump.
+func cardHeightFor(short bool) int {
+	if short {
+		return compactCardHeight
+	}
+	return cardHeight
+}
 
+// renderCard renders a single face-up card wrapped in a rounded border. At full
+// density it is a 3-line body: rank in the top-left AND bottom-right (fixed
+// 2-char field) with a centered suit. At compact (short) density it collapses to
+// a single body row carrying rank+suit together (e.g. "10♥"). Every card shares
+// the same soft-white border; only the rank text and suit glyph are tinted — red
+// for hearts/diamonds, soft white for spades/clubs.
+func renderCard(c engine.Card, short bool) string {
 	style := cardDefaultStyle
 	if c.Suit.Red() {
 		style = cardRedStyle
 	}
+	if short {
+		body := padRight(c.Rank.String()+c.Suit.String(), cardInnerWidth)
+		return style.Render(body)
+	}
+	top := padRight(rankField(c.Rank, false), cardInnerWidth)
+	mid := center(c.Suit.String(), cardInnerWidth)
+	bot := padLeft(rankField(c.Rank, true), cardInnerWidth)
+	body := strings.Join([]string{top, mid, bot}, "\n")
 	return style.Render(body)
 }
 
 // renderCardBack renders a face-down card with a distinct hatch pattern so it is
-// unmistakably a hidden card. Same footprint as a face-up card.
-func renderCardBack() string {
+// unmistakably a hidden card. Same footprint as a face-up card at the chosen
+// density (3 hatch rows full, 1 hatch row compact).
+func renderCardBack(short bool) string {
 	row := strings.Repeat("▚", cardInnerWidth)
-	body := strings.Join([]string{row, row, row}, "\n")
-	return cardBackStyle.Render(body)
+	rows := []string{row, row, row}
+	if short {
+		rows = []string{row}
+	}
+	return cardBackStyle.Render(strings.Join(rows, "\n"))
 }
 
 // handGap is the number of blank columns between adjacent cards. Compact mode
@@ -100,7 +118,7 @@ func joinCards(cards []string, compact bool) string {
 // renderHandCount lays out the first `count` cards of a player hand as
 // side-by-side face-up cards. The feel tier passes a count below len(cards) so
 // the initial deal can cascade in one card at a time.
-func renderHandCount(cards []engine.Card, count int, compact bool) string {
+func renderHandCount(cards []engine.Card, count int, compact, short bool) string {
 	if count > len(cards) {
 		count = len(cards)
 	}
@@ -109,7 +127,7 @@ func renderHandCount(cards []engine.Card, count int, compact bool) string {
 	}
 	boxes := make([]string, count)
 	for i := 0; i < count; i++ {
-		boxes[i] = renderCard(cards[i])
+		boxes[i] = renderCard(cards[i], short)
 	}
 	return joinCards(boxes, compact)
 }
@@ -118,13 +136,13 @@ func renderHandCount(cards []engine.Card, count int, compact bool) string {
 // [0,dealerFaceUp) are drawn face up and the remaining drawn slots (up to
 // dealerCards) are face-down backs. This drives both the deal cascade (hole as a
 // back) and the dealer reveal (hole flips, draws appear one at a time).
-func renderDealerHandFrame(dv engine.DealerView, f revealFrame, compact bool) string {
+func renderDealerHandFrame(dv engine.DealerView, f revealFrame, compact, short bool) string {
 	boxes := make([]string, 0, f.dealerCards)
 	for i := 0; i < f.dealerCards && i < len(dv.Cards); i++ {
 		if i < f.dealerFaceUp {
-			boxes = append(boxes, renderCard(dv.Cards[i]))
+			boxes = append(boxes, renderCard(dv.Cards[i], short))
 		} else {
-			boxes = append(boxes, renderCardBack())
+			boxes = append(boxes, renderCardBack(short))
 		}
 	}
 	return joinCards(boxes, compact)

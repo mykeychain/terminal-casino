@@ -128,7 +128,12 @@ bankroll count; input locked during anim; player hits stay instant.
 
 # Polish — Responsive layout (v2.2). Spec: `docs/RESPONSIVE_SPEC.md`. UI-only.
 
-## RL.1 — Anchored frame + height density + compact cards  🔨
+## RL.1 — Anchored frame + height density + compact cards  ✅
+Reviewed: build/vet/test green, only ui/ changed, engine untouched. Verified exact fit
+(Height(view)==m.height) at 20/24/40 rows with title on row 0 and controls on the last
+line; compact 3-row cards at small heights, full at large. Open cosmetic items (not
+blocking): tall-terminal middle gap (table top-aligned) and sparse betting middle — both
+resolvable by centering the table/panel in the middle region if desired.
 Owner: subagent. Compose view to exactly m.height (title top / controls bottom / table
 flex middle); pick full vs compact card density by available height; add 3-row compact card.
 **Gate:** height sweep exact-fit tests; title+controls always visible; frames reviewed.
