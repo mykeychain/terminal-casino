@@ -11,6 +11,31 @@ Status legend: ⬜ not started · 🔨 in progress · 🔎 in review · ✅ done
 
 ---
 
+# Part 1 — Casino SSH server + repo reorg (v2.0). Spec: `docs/PART1_SSH_SPEC.md`.
+New module path: `github.com/mykeychain/terminal-casino`.
+
+## P1.1 — Repo reorg (root module, relocate packages, docs → docs/)  🔨
+Owner: subagent.
+- go.mod → root, module `github.com/mykeychain/terminal-casino`; `32blackjack/internal/engine`
+  → `internal/blackjack32/engine`; `internal/ui` → `internal/blackjack32/ui`;
+  `cmd/32blackjack` → `cmd/casino` (still direct-to-blackjack for now); `*.md` → `docs/`.
+- Update all import paths. Engine/UI code UNCHANGED.
+**Gate:** `go build/vet/test` green, zero behavior change.
+
+## P1.2 — game interface + theme + blackjack32 adapter  ⬜
+**Gate:** builds; blackjack reachable via game.Game.
+
+## P1.3 — casino lobby app (+ tests); cmd/casino lands in lobby  ⬜
+**Gate:** transitions tested.
+
+## P1.4 — SSH server (cmd/casino-ssh, 4A ops)  ⬜
+**Gate:** builds; SSH round-trip frames captured.
+
+## P1.5 — README + polish  ⬜
+**Gate:** full green + SSH round-trip verified.
+
+---
+
 ## Phase 1 — Engine core (card / hand / shoe) + deterministic construction  ✅
 Owner: subagent
 - go.mod + directory scaffold, compiles.
