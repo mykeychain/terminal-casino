@@ -1,22 +1,37 @@
-# 32blackjack — 3:2 Blackjack (terminal)
+# Terminal Casino
 
-A single-player, local, terminal Blackjack game with rendered cards, played with
-classic **3:2** rules. Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea)
-and [Lip Gloss](https://github.com/charmbracelet/lipgloss). This is v1 of a larger
-"terminal casino" project; the game engine is a pure, UI-agnostic Go package so a
-later SSH phase can reuse it unchanged.
+A terminal casino with rendered cards, built with [Bubble Tea](https://github.com/charmbracelet/bubbletea)
+and [Lip Gloss](https://github.com/charmbracelet/lipgloss). Connect (locally or over SSH),
+pick a table from the lobby, and play. Today's table is **3:2 Blackjack** — classic 3:2
+rules with up to three hands, split, double, and insurance.
 
-Local only — no networking, no persistence (bankroll resets to $1000 every launch).
+Each session is independent: a fresh $1000 bankroll, no accounts, no persistence
+(bankroll resets when you leave). The game engine is a pure, UI-agnostic Go package;
+the same engine backs both the local and the SSH front ends.
 
 ## Run
 
-Requires Go (1.24+). From this directory:
+Requires Go (1.24+).
+
+**Locally** (lobby → game on your own terminal):
 
 ```
-go run ./cmd/32blackjack
+go run ./cmd/casino
 ```
 
-Run the engine's unit tests:
+**As an SSH server** (serves the same lobby to anyone who connects):
+
+```
+go run ./cmd/casino-ssh            # listens on :23234 by default
+# then, from another terminal:
+ssh -p 23234 localhost
+```
+
+Server flags: `-addr` (listen address, or `CASINO_SSH_ADDR`; default `:23234`) and
+`-host-key` (path to the SSH host key, generated on first run; default `.ssh/casino_ed25519`).
+Stop the server with Ctrl+C — it shuts down gracefully.
+
+Run the tests:
 
 ```
 go test ./...
@@ -82,20 +97,26 @@ the engine would reject.
 ## Architecture
 
 ```
-32blackjack/
-  cmd/32blackjack/main.go     entry point; starts the Bubble Tea program
-  internal/engine/            pure game logic — no TUI imports, fully unit-tested
-    card.go                   Card, Rank, Suit, Deck, 6-deck Shoe (injected RNG)
-    hand.go                   hand value (soft/hard, multi-ace), blackjack/bust
-    game.go                   state machine, actions, peek/H17, settlement/payouts
-    *_test.go                 engine unit tests
-  internal/ui/                Bubble Tea model/update/view
-    model.go                  the Model over the engine
-    render_card.go            box-drawing card rendering
-    styles.go                 Lip Gloss styles
+terminal-casino/
+  cmd/
+    casino/main.go            local entry point (lobby → game on stdout)
+    casino-ssh/main.go        SSH server (Charm Wish) serving the same lobby per connection
+  internal/
+    game/                     the Game interface the lobby dispatches to
+    theme/                    shared Lip Gloss palette
+    casino/                   the lobby / game-selector Bubble Tea app
+    blackjack32/              the "3:2 Blackjack" variant (adapter → game.Game)
+      engine/                 pure game logic — no TUI imports, fully unit-tested
+        card.go               Card, Rank, Suit, Deck, 6-deck Shoe (injected RNG)
+        hand.go               hand value (soft/hard, multi-ace), blackjack/bust
+        game.go               state machine, actions, peek/H17, settlement/payouts
+        *_test.go             engine unit tests
+      ui/                     Bubble Tea model/update/view + card rendering
 ```
 
 The engine holds all mutable state on the `Game` value (no global/package state) and
-owns its own injected random source, so many independent games can run in one process
-— what a later multiplayer/SSH layer will need. The UI never computes hand values,
-legality, or payouts; it asks the engine and renders the result.
+owns its own injected random source, so every connection runs its own independent game
+in one process — which is what the SSH server relies on. The UI never computes hand
+values, legality, or payouts; it asks the engine and renders the result. Adding a new
+game means implementing `game.Game` and registering it in the `cmd/*` wiring — the
+lobby and SSH server need no changes.

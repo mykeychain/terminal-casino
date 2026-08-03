@@ -30,11 +30,17 @@ Reviewed: app.go state machine clean (global q/ctrl+c quit, Esc→lobby intercep
 async msgs forwarded, games unaware of lobby); casino tests pass; engine untouched.
 **Gate:** transitions tested.
 
-## P1.4 — SSH server (cmd/casino-ssh, 4A ops)  ⬜
-**Gate:** builds; SSH round-trip frames captured.
+## P1.4 — SSH server (cmd/casino-ssh, 4A ops)  ✅
+Charm Wish server (wish v1.3.2, ssh pre-rename to stay on Go 1.24); bubbletea+activeterm+
+logging middleware; persisted host key, -addr/CASINO_SSH_ADDR, graceful shutdown; TrueColor
+pinned. Verified end-to-end: started locally, connected via a Go x/crypto/ssh client with a
+PTY, saw lobby (TERMINAL CASINO / 3:2 Blackjack) then in-game (Bankroll / Place your bet)
+over the wire. Frames captured & sent.
 
-## P1.5 — README + polish  ⬜
-**Gate:** full green + SSH round-trip verified.
+## P1.5 — README + polish  ✅
+README rewritten for the casino (local + SSH run, connect, flags, new architecture tree);
+fixed game description (6-deck, up to 3 hands). Full build/vet/test green.
+**Gate:** full green + SSH round-trip verified.  ✅ PART 1 COMPLETE.
 
 ---
 

@@ -23,7 +23,7 @@ type adapter struct{}
 func (adapter) Title() string { return "3:2 Blackjack" }
 
 func (adapter) Description() string {
-	return "Single-deck 3:2 blackjack — split, double, insurance. Fresh $1000 bankroll."
+	return "6-deck 3:2 blackjack — up to 3 hands, split, double, insurance. Fresh $1000 bankroll."
 }
 
 // New builds a fresh blackjack model over a newly-seeded game and pre-delivers
