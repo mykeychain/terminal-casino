@@ -252,12 +252,16 @@ func (m Model) frame() revealFrame {
 		}
 
 	case animResult:
+		// Show the controls (the Next-hand prompt) as soon as the round resolves —
+		// the bankroll keeps ticking in the banner, but the UI stays actionable
+		// instead of collapsing to a lone outcome message.
 		return revealFrame{
 			dealerCards:  len(dv.Cards),
 			dealerFaceUp: len(dv.Cards),
 			playerCards:  fullCounts(hands),
 			showOutcomes: true,
 			showBanner:   true,
+			showControls: true,
 		}
 
 	default: // animIdle: render straight from engine state (pre-feel-tier behavior)

@@ -105,8 +105,15 @@ func (m Model) handleKey(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	// Input is locked while an animation runs (locked decision 3). Keys other
-	// than quit are ignored, not queued.
+	// than quit are ignored, not queued — except that during the result the
+	// Next-hand control is shown, so the confirm key finishes the count-up and
+	// advances (the UI is always actionable at resolution).
 	if m.animState != animIdle {
+		if m.animState == animResult && (key == "enter" || key == " ") {
+			m.animState = animIdle
+			m.displayBankroll = m.game.Bankroll()
+			return m.handleRoundOver(key)
+		}
 		return m, nil
 	}
 
