@@ -430,10 +430,13 @@ func (m Model) renderDealerArea(f revealFrame) string {
 		status = describeHandValue(rv.Value(), rv.IsSoft(), false)
 	}
 
-	if f.dealerCards == 0 {
+	if len(m.game.Player()) == 0 {
+		// No round in progress (betting): no dealer row to reserve.
 		return label + "  " + status
 	}
-	cards := renderDealerHandFrame(dv, f, m.compact())
+	// Reserve a fixed-height card row so the layout doesn't jump as the dealer's
+	// cards cascade in — the row is blank space until the up-card lands.
+	cards := lipgloss.NewStyle().Height(cardHeight).Render(renderDealerHandFrame(dv, f, m.compact()))
 	return label + "  " + status + "\n" + cards
 }
 
@@ -495,7 +498,9 @@ func (m Model) renderHandBlock(idx int, h engine.HandView, multi, roundOver bool
 		caption = keyHintStyle.Render("◀ active")
 	}
 
-	cards := renderHandCount(h.Cards, count, m.compact())
+	// Reserve a fixed-height card row so a hand block keeps its height as its cards
+	// cascade in (blank until the first card lands), preventing vertical jumping.
+	cards := lipgloss.NewStyle().Height(cardHeight).Render(renderHandCount(h.Cards, count, m.compact()))
 
 	// Show the hand total only once every card in this hand is on the table, so
 	// the deal cascade does not spoil a not-yet-complete total.

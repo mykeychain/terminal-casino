@@ -23,6 +23,7 @@ var (
 const (
 	cardInnerWidth = 5 // characters between the vertical borders
 	rankFieldWidth = 2 // reserved field so "10" and "A" both occupy 2 cells
+	cardHeight     = 5 // rendered card height: 3 body rows + 2 border rows
 )
 
 // Card styles. Every card shares the same soft-white rounded border; only the

@@ -33,11 +33,11 @@ const (
 
 // Timing constants for the feel tier. All are tunable here in one place.
 const (
-	dealBeat     = 150 * time.Millisecond // per card during the initial deal
-	dealerBeat   = 350 * time.Millisecond // per card as the dealer draws (suspense)
-	flipPause    = 300 * time.Millisecond // hole-card reveal beat before dealer draws
-	resultHold   = 600 * time.Millisecond // banner hold before Next hand unlocks
-	bankrollTick = 450 * time.Millisecond // total duration of the bankroll count-up
+	dealBeat     = 450 * time.Millisecond  // per card during the initial deal
+	dealerBeat   = 1050 * time.Millisecond // per card as the dealer draws (suspense)
+	flipPause    = 900 * time.Millisecond  // hole-card reveal beat before dealer draws
+	resultHold   = 1800 * time.Millisecond // banner hold before Next hand unlocks
+	bankrollTick = 1350 * time.Millisecond // total duration of the bankroll count-up
 
 	// bankrollSteps is the number of frames the bankroll count animation is
 	// divided into; each frame is bankrollTick/bankrollSteps apart.
