@@ -332,11 +332,15 @@ func (m Model) renderBanner() string {
 		}
 	}
 
+	// base keeps the outcome color (no blink) for the bankroll line below.
+	base := style
 	// Blink the headline on a win.
 	if win {
 		style = style.Blink(true)
 	}
-	// Indent to line up with the hand rows (the hand block's border + padding),
-	// rather than sitting flush at the far left.
-	return handIndent + style.Render(text)
+	// Two indented lines (aligned with the hand rows): the outcome, then the
+	// player's bankroll — value only, no label — which ticks during animResult.
+	outcome := handIndent + style.Render(text)
+	bankroll := handIndent + base.Render(fmt.Sprintf("$%d", m.displayBankroll))
+	return outcome + "\n" + bankroll
 }
