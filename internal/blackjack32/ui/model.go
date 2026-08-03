@@ -151,13 +151,13 @@ func clampIdx(i, n int) int {
 func (m Model) handleBetting(key string) (tea.Model, tea.Cmd) {
 	m.focusedSpot = clampIdx(m.focusedSpot, m.game.NumSpots())
 	switch key {
-	case "right", "up":
+	case "right":
 		m.adjustBet(engine.BetIncrement)
-	case "left", "down":
+	case "left":
 		m.adjustBet(-engine.BetIncrement)
-	case "shift+right", "shift+up", "pgup":
+	case "up", "pgup":
 		m.adjustBet(coarseBetStep)
-	case "shift+left", "shift+down", "pgdown":
+	case "down", "pgdown":
 		m.adjustBet(-coarseBetStep)
 	case "tab":
 		if m.focusedSpot < m.game.NumSpots()-1 {
@@ -643,8 +643,8 @@ func (m Model) renderBetTiles() string {
 func (m Model) bettingHint() string {
 	n := m.game.NumSpots()
 	parts := []string{
-		fmt.Sprintf("← → bet ±$%d", engine.BetIncrement),
-		fmt.Sprintf("shift ±$%d", coarseBetStep),
+		fmt.Sprintf("← → ±$%d", engine.BetIncrement),
+		fmt.Sprintf("↑ ↓ ±$%d", coarseBetStep),
 	}
 	if n > 1 {
 		parts = append(parts, "tab ⇄ switch")
