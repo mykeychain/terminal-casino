@@ -112,6 +112,15 @@ approved roles; red cards use soft-white border with only rank+suit red (`cardRe
 menu driven off `LegalActions()`, dispatched to engine methods with `CanAct` re-check, cursor
 clamped/reset by menu signature — no game logic in UI. Fresh frames sent for user review.
 
+# Polish — Feel tier (v2.1). Spec: `docs/FEELTIER_SPEC.md`. UI-only, engine untouched.
+
+## FT.1 — Deal/dealer animation + result juice + bankroll tick  🔨
+Owner: subagent. Animate deal reveal, dealer play (UI-revealed, suspense), result banner +
+bankroll count; input locked during anim; player hits stay instant.
+**Gate:** build/vet/test green; engine untouched; frame-sequence reviewed by orchestrator.
+
+---
+
 ## Review log
 
 **Phase 7 (multi-hand engine) — APPROVED.** Reviewed by orchestrator by reading game.go:
