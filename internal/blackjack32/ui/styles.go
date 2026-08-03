@@ -24,6 +24,10 @@ const (
 	cardInnerWidth = 5 // characters between the vertical borders
 	rankFieldWidth = 2 // reserved field so "10" and "A" both occupy 2 cells
 	cardHeight     = 5 // rendered card height: 3 body rows + 2 border rows
+
+	// handIndent is how far a hand block's content sits from the left (its border +
+	// padding). Other free-standing rows (e.g. the result banner) use it to align.
+	handIndent = "  "
 )
 
 // Card styles. Every card shares the same soft-white rounded border; only the

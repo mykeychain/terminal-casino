@@ -488,14 +488,11 @@ func renderRoundNet(net int) string {
 // with value/bet (and outcome once the round is over). The active hand gets a
 // highlighted border; others get an equal-size invisible border so nothing jumps.
 func (m Model) renderHandBlock(idx int, h engine.HandView, multi, roundOver bool, count int) string {
+	// No "active" caption: the highlighted (gold) border already marks the active
+	// hand. Multi-hand rounds keep a "Hand N" label to identify the spots.
 	var caption string
 	if multi {
 		caption = fmt.Sprintf("Hand %d", idx+1)
-		if h.Active {
-			caption += " " + keyHintStyle.Render("◀ active")
-		}
-	} else if h.Active {
-		caption = keyHintStyle.Render("◀ active")
 	}
 
 	// Reserve a fixed-height card row so a hand block keeps its height as its cards
@@ -748,17 +745,17 @@ func describeHandValue(value int, soft, blackjack bool) string {
 	}
 }
 
-// outcomeText renders a settled per-hand outcome with its money delta.
+// outcomeText renders a settled per-hand outcome as its colored money delta. The
+// win/lose wording is dropped — the +/- and color convey direction, and the result
+// banner already names the outcome. Push has no delta, so it keeps its label.
 func outcomeText(o engine.Outcome, net int) string {
 	switch o {
-	case engine.OutcomeBlackjack:
-		return blackjackStyle.Render(fmt.Sprintf("Blackjack! +$%d", net))
-	case engine.OutcomeWin:
-		return winStyle.Render(fmt.Sprintf("Win +$%d", net))
+	case engine.OutcomeBlackjack, engine.OutcomeWin:
+		return winStyle.Render(fmt.Sprintf("+$%d", net))
 	case engine.OutcomePush:
 		return pushStyle.Render("Push")
 	case engine.OutcomeLose:
-		return loseStyle.Render(fmt.Sprintf("Lose -$%d", -net))
+		return loseStyle.Render(fmt.Sprintf("-$%d", -net))
 	default:
 		return ""
 	}

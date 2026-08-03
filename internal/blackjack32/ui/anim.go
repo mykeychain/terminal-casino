@@ -332,10 +332,11 @@ func (m Model) renderBanner() string {
 		}
 	}
 
-	// Blink the headline on a win; the banner is left-aligned like the rest of the
-	// table.
+	// Blink the headline on a win.
 	if win {
 		style = style.Blink(true)
 	}
-	return style.Render(text)
+	// Indent to line up with the hand rows (the hand block's border + padding),
+	// rather than sitting flush at the far left.
+	return handIndent + style.Render(text)
 }
