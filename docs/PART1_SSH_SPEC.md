@@ -80,6 +80,12 @@ pulling `charmbracelet/ssh` and `golang.org/x/crypto`. `go mod tidy`.
 4. **SSH server** (`cmd/casino-ssh`, 4A ops). Gate: builds; SSH round-trip frames captured.
 5. **README + polish.** Gate: full green + SSH round-trip verified.
 
-## Deferred (4B follow-up)
-Idle-session timeout · max-concurrent-sessions cap ("tables full") · structured connection
-logging/metrics · player identity/handles (toward leaderboards). Separate plan when ready.
+## 4B follow-up  ✅ (done, except identity)
+Idle-session timeout (`-idle-timeout`/`CASINO_SSH_IDLE_TIMEOUT`, default 15m, 0 disables) ·
+max-concurrent-sessions cap ("casino is full" message) via `-max-sessions`/
+`CASINO_SSH_MAX_SESSIONS` (default 50, 0 = unlimited), enforced by an atomic `sessionLimiter`
+middleware · structured connect/disconnect logging (user, addr, live active count, duration).
+`activeterm` reordered outermost so non-PTY sessions are rejected before the cap counts them.
+Verified via Go x/crypto/ssh smoke tests.
+
+Still deferred: player identity/handles (toward leaderboards) · metrics export. Separate plan when ready.

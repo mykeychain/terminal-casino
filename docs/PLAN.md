@@ -37,6 +37,16 @@ pinned. Verified end-to-end: started locally, connected via a Go x/crypto/ssh cl
 PTY, saw lobby (TERMINAL CASINO / 3:2 Blackjack) then in-game (Bankroll / Place your bet)
 over the wire. Frames captured & sent.
 
+## P1.4B — SSH ops follow-up (idle timeout · session cap · structured logging)  ✅
+Added `-idle-timeout` (env `CASINO_SSH_IDLE_TIMEOUT`, default 15m, 0 disables) wiring
+`srv.IdleTimeout`; a `sessionLimiter` (atomic counter) middleware capping concurrent
+sessions via `-max-sessions` (env `CASINO_SSH_MAX_SESSIONS`, default 50, 0 = unlimited)
+with a "casino is full" message; and structured connect/disconnect logs (user, addr,
+live active count, session duration). Middleware reordered so `activeterm` runs outermost
+(rejects non-PTY before the cap counts it). Verified via Go x/crypto/ssh smoke tests: cap
+rejects the 2nd session at `-max-sessions 1`, idle reaps after `-idle-timeout 1s`, logs
+emit. README + deploy/README flag docs updated. **Gate:** build/vet/test green + ops verified.
+
 ## P1.5 — README + polish  ✅
 README rewritten for the casino (local + SSH run, connect, flags, new architecture tree);
 fixed game description (6-deck, up to 3 hands). Full build/vet/test green.
