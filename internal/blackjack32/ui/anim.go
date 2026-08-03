@@ -33,7 +33,7 @@ const (
 
 // Timing constants for the feel tier. All are tunable here in one place.
 const (
-	dealBeat     = 450 * time.Millisecond  // per card during the initial deal
+	dealBeat     = 300 * time.Millisecond  // per card during the initial deal (2x original)
 	dealerBeat   = 1050 * time.Millisecond // per card as the dealer draws (suspense)
 	flipPause    = 900 * time.Millisecond  // hole-card reveal beat before dealer draws
 	resultHold   = 1800 * time.Millisecond // banner hold before Next hand unlocks
@@ -298,13 +298,14 @@ func (m Model) renderBanner() string {
 
 	var text string
 	var style lipgloss.Style
+	var win bool
 	if len(hands) == 1 {
 		h := hands[0]
 		switch h.Outcome {
 		case engine.OutcomeBlackjack:
-			text, style = fmt.Sprintf("BLACKJACK! +$%d", h.Net), blackjackStyle
+			text, style, win = fmt.Sprintf("BLACKJACK! +$%d", h.Net), blackjackStyle, true
 		case engine.OutcomeWin:
-			text, style = fmt.Sprintf("WIN +$%d", h.Net), winStyle
+			text, style, win = fmt.Sprintf("WIN +$%d", h.Net), winStyle, true
 		case engine.OutcomePush:
 			text, style = "PUSH", pushStyle
 		case engine.OutcomeLose:
@@ -323,7 +324,7 @@ func (m Model) renderBanner() string {
 		}
 		switch {
 		case net > 0:
-			text, style = fmt.Sprintf("YOU WIN +$%d", net), winStyle
+			text, style, win = fmt.Sprintf("YOU WIN +$%d", net), winStyle, true
 		case net < 0:
 			text, style = fmt.Sprintf("YOU LOSE -$%d", -net), loseStyle
 		default:
@@ -331,9 +332,10 @@ func (m Model) renderBanner() string {
 		}
 	}
 
-	banner := style.Render(text)
-	if m.width > 0 {
-		return lipgloss.PlaceHorizontal(m.width, lipgloss.Center, banner)
+	// Blink the headline on a win; the banner is left-aligned like the rest of the
+	// table.
+	if win {
+		style = style.Blink(true)
 	}
-	return banner
+	return style.Render(text)
 }
