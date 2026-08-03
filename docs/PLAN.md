@@ -22,10 +22,12 @@ Owner: subagent.
 - Update all import paths. Engine/UI code UNCHANGED.
 **Gate:** `go build/vet/test` green, zero behavior change.
 
-## P1.2 — game interface + theme + blackjack32 adapter  ⬜
+## P1.2 — game interface + theme + blackjack32 adapter  ✅
 **Gate:** builds; blackjack reachable via game.Game.
 
-## P1.3 — casino lobby app (+ tests); cmd/casino lands in lobby  ⬜
+## P1.3 — casino lobby app (+ tests); cmd/casino lands in lobby  ✅
+Reviewed: app.go state machine clean (global q/ctrl+c quit, Esc→lobby intercept, size +
+async msgs forwarded, games unaware of lobby); casino tests pass; engine untouched.
 **Gate:** transitions tested.
 
 ## P1.4 — SSH server (cmd/casino-ssh, 4A ops)  ⬜
