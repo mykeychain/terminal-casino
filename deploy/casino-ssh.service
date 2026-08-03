@@ -1,0 +1,41 @@
+# systemd unit for the Terminal Casino SSH server.
+# Install:
+#   sudo useradd --system --no-create-home --shell /usr/sbin/nologin casino
+#   sudo mkdir -p /opt/terminal-casino && sudo cp casino-ssh /opt/terminal-casino/
+#   sudo cp deploy/casino-ssh.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now casino-ssh
+# Logs:   journalctl -u casino-ssh -f
+[Unit]
+Description=Terminal Casino SSH server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=casino
+Group=casino
+WorkingDirectory=/opt/terminal-casino
+
+# StateDirectory creates/owns /var/lib/terminal-casino (writable) for the host key,
+# so it persists across restarts and clients don't get host-key-changed warnings.
+StateDirectory=terminal-casino
+ExecStart=/opt/terminal-casino/casino-ssh -addr :22 -host-key /var/lib/terminal-casino/casino_ed25519
+
+# Bind the privileged port 22 without running as full root.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+
+Restart=on-failure
+RestartSec=2
+
+# Hardening.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

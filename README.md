@@ -37,6 +37,13 @@ Run the tests:
 go test ./...
 ```
 
+## Deploying
+
+To host the SSH server so others can connect (including a free-tier GCP e2-micro
+setup that gets you `ssh terminal-casino.<yourdomain>` on port 22), see
+[`deploy/README.md`](deploy/README.md). It also ships a `systemd` unit
+(`deploy/casino-ssh.service`) and a `Dockerfile`.
+
 ## Controls
 
 Navigation is arrow-driven: each phase shows a horizontal menu (or, when betting,
