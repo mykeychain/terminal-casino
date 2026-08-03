@@ -162,5 +162,8 @@ Map `-p 22:23234` for the default port (the host must not already use 22).
 - Keep the **admin SSH** port (2222) restricted to your own IP in the firewall.
 - The **host key persists** (`/var/lib/terminal-casino/`), so returning players don't
   get "host key changed" warnings.
-- Before heavy public exposure, consider the Part 1 follow-up (idle-session timeout,
-  max-concurrent-session cap, structured logging) — tracked in `docs/PART1_SSH_SPEC.md`.
+- **Abuse limits are built in.** Idle sessions are reaped after 15m and concurrent
+  sessions are capped at 50 by default (over-cap connections get a "casino is full"
+  message). Tune both with `-idle-timeout` / `-max-sessions` (or the `CASINO_SSH_*`
+  env vars) — see the flags in §2. Connects/disconnects are logged with the live
+  session count and duration (`journalctl -u casino-ssh`).
