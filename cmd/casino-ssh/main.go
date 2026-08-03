@@ -14,18 +14,17 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
 	"github.com/charmbracelet/wish/activeterm"
 	bm "github.com/charmbracelet/wish/bubbletea"
 	"github.com/charmbracelet/wish/logging"
-	"github.com/muesli/termenv"
 
 	"github.com/mykeychain/terminal-casino/internal/blackjack32"
 	"github.com/mykeychain/terminal-casino/internal/casino"
 	"github.com/mykeychain/terminal-casino/internal/game"
+	"github.com/mykeychain/terminal-casino/internal/theme"
 )
 
 func main() {
@@ -33,11 +32,9 @@ func main() {
 	hostKey := flag.String("host-key", ".ssh/casino_ed25519", "path to the SSH host key (generated if absent)")
 	flag.Parse()
 
-	// Fixed server-wide color profile: ANSI256 is universally supported (including
-	// macOS Terminal.app, which mis-renders 24-bit truecolor) and is the reliable
-	// choice over SSH, where the truecolor hint is usually not forwarded. Lip Gloss
-	// downsamples the hex palette to the nearest 256-color for every client.
-	lipgloss.SetColorProfile(termenv.ANSI256)
+	// Pin the shared color profile — identical to the local binary, so local and
+	// remote render the same (see theme.Profile).
+	theme.Apply()
 
 	srv, err := wish.NewServer(
 		wish.WithAddress(*addr),

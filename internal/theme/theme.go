@@ -5,7 +5,22 @@
 // now, so a little duplication is expected.
 package theme
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
+)
+
+// Profile is the single color profile every front end pins, so rendering is
+// identical whether the game runs locally or over SSH (which makes debugging
+// straightforward). ANSI256 is universally supported — including macOS
+// Terminal.app, which mis-renders 24-bit truecolor — and is the reliable choice
+// over SSH, where the truecolor hint is usually not forwarded. Lip Gloss
+// downsamples the hex palette below to the nearest 256-color for every client.
+const Profile = termenv.ANSI256
+
+// Apply pins the shared color profile. Call once at program startup, before any
+// styles are rendered, from every entry point (local and SSH).
+func Apply() { lipgloss.SetColorProfile(Profile) }
 
 // Palette (true-color hex; lipgloss degrades on limited terminals).
 var (

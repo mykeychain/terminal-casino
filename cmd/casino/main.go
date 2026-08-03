@@ -12,13 +12,13 @@ import (
 	"github.com/mykeychain/terminal-casino/internal/blackjack32"
 	"github.com/mykeychain/terminal-casino/internal/casino"
 	"github.com/mykeychain/terminal-casino/internal/game"
+	"github.com/mykeychain/terminal-casino/internal/theme"
 )
 
 func main() {
-	// Locally, let Lip Gloss auto-detect the terminal's color capability from its
-	// stdout. Forcing TrueColor breaks terminals that only do 256 colors (e.g.
-	// macOS Terminal.app renders 24-bit sequences as garbage); auto-detect
-	// downsamples the palette correctly for whatever terminal is attached.
+	// Pin the shared color profile — identical to the SSH server, so local and
+	// remote render the same (see theme.Profile).
+	theme.Apply()
 
 	games := []game.Game{
 		blackjack32.Game(),
