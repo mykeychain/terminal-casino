@@ -126,6 +126,15 @@ bankroll count; input locked during anim; player hits stay instant.
 
 ---
 
+# Polish — Responsive layout (v2.2). Spec: `docs/RESPONSIVE_SPEC.md`. UI-only.
+
+## RL.1 — Anchored frame + height density + compact cards  🔨
+Owner: subagent. Compose view to exactly m.height (title top / controls bottom / table
+flex middle); pick full vs compact card density by available height; add 3-row compact card.
+**Gate:** height sweep exact-fit tests; title+controls always visible; frames reviewed.
+
+---
+
 ## Review log
 
 **Phase 7 (multi-hand engine) — APPROVED.** Reviewed by orchestrator by reading game.go:
