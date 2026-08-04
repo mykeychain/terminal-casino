@@ -92,6 +92,21 @@ func raiseAllStreets(t *testing.T, m Model) Model {
 	return m
 }
 
+// advanceToNextHand presses "Next hand" from a settled hand and runs the
+// board-clear sweep to completion via its ticks, landing on the next hand
+// (betting) or game over.
+func advanceToNextHand(t *testing.T, m Model) Model {
+	t.Helper()
+	m, _ = upd(t, m, keyEnter) // start the board-clear sweep
+	for i := 0; i < numBoard+2 && m.animState == animClearing; i++ {
+		m, _ = upd(t, m, clearTickMsg{})
+	}
+	if m.animState != animIdle {
+		t.Fatalf("board-clear sweep did not finish (animState = %d)", m.animState)
+	}
+	return m
+}
+
 // ---- tests ----
 
 // TestPhasesRenderWithoutPanic is the layout smoke test: every phase, across a
@@ -324,7 +339,7 @@ func TestGameOverRestart(t *testing.T) {
 	m := sized(t, newTestModel(engine.MinBet, flushDeck()), 90, 30)
 	m, _ = upd(t, m, keyEnter)     // deal (ante escrowed)
 	m, _ = upd(t, m, keyRune('f')) // fold -> lose the ante, bankroll 0
-	m, _ = upd(t, m, keyEnter)     // NextHand -> game over
+	m = advanceToNextHand(t, m)    // Next hand + sweep -> game over
 	if m.game.Phase() != engine.PhaseGameOver {
 		t.Fatalf("phase = %v, want PhaseGameOver", m.game.Phase())
 	}
@@ -360,19 +375,63 @@ func TestRaiseOnlyOffersLegalMultiples(t *testing.T) {
 	}
 }
 
-// TestBoardClearsOnNextHand checks that choosing "Next hand" returns to a clean
-// betting screen — the settled hand's community and hole cards are gone, not left
-// lingering on the felt.
+// TestBoardClearsOnNextHand checks that once the clear sweep finishes, the next
+// betting screen is clean — the settled hand's community and hole cards are gone,
+// not left lingering on the felt.
 func TestBoardClearsOnNextHand(t *testing.T) {
 	m := sized(t, newTestModel(1000, flushDeck()), 100, 30)
-	m, _ = upd(t, m, keyEnter) // deal
-	m = raiseAllStreets(t, m)  // settle
-	m, _ = upd(t, m, keyEnter) // Next hand -> betting
+	m, _ = upd(t, m, keyEnter)  // deal
+	m = raiseAllStreets(t, m)   // settle
+	m = advanceToNextHand(t, m) // Next hand + run the sweep -> betting
 	if m.game.Phase() != engine.PhaseBetting {
 		t.Fatalf("after Next hand: phase = %v, want betting", m.game.Phase())
 	}
 	view := stripANSI(m.View())
 	if strings.Contains(view, "Community") || strings.Contains(view, "▚") {
 		t.Fatalf("board not cleared on the new-hand betting screen:\n%s", view)
+	}
+}
+
+// TestClearSweepRemovesCardsOneByOne checks the board-clear animation: pressing
+// "Next hand" starts a sweep with the full board on the felt, each tick removes
+// one card, and the final tick advances to the next hand's betting screen.
+func TestClearSweepRemovesCardsOneByOne(t *testing.T) {
+	m := sized(t, newTestModel(1000, flushDeck()), 100, 30)
+	m, _ = upd(t, m, keyEnter) // deal
+	m = raiseAllStreets(t, m)  // settle -> full board
+	m, _ = upd(t, m, keyEnter) // Next hand -> start sweep
+	if m.animState != animClearing || m.boardShown != numBoard {
+		t.Fatalf("after Next hand: animState=%d boardShown=%d, want clearing / %d",
+			m.animState, m.boardShown, numBoard)
+	}
+	// Each tick removes exactly one card while the sweep is still running.
+	for want := numBoard - 1; want >= 1; want-- {
+		m, _ = upd(t, m, clearTickMsg{})
+		if m.boardShown != want {
+			t.Fatalf("boardShown = %d, want %d", m.boardShown, want)
+		}
+		if m.animState != animClearing {
+			t.Fatalf("sweep ended early at boardShown %d", want)
+		}
+	}
+	// The final tick clears the felt and advances to the next hand.
+	m, _ = upd(t, m, clearTickMsg{})
+	if m.animState != animIdle || m.game.Phase() != engine.PhaseBetting {
+		t.Fatalf("after final tick: animState=%d phase=%v, want idle / betting",
+			m.animState, m.game.Phase())
+	}
+}
+
+// TestClearSweepSkip checks that enter/space during the sweep skips straight to
+// the next hand instead of waiting out the ticks.
+func TestClearSweepSkip(t *testing.T) {
+	m := sized(t, newTestModel(1000, flushDeck()), 100, 30)
+	m, _ = upd(t, m, keyEnter) // deal
+	m = raiseAllStreets(t, m)  // settle
+	m, _ = upd(t, m, keyEnter) // Next hand -> start sweep
+	m, _ = upd(t, m, keyEnter) // skip
+	if m.animState != animIdle || m.game.Phase() != engine.PhaseBetting {
+		t.Fatalf("after skip: animState=%d phase=%v, want idle / betting",
+			m.animState, m.game.Phase())
 	}
 }

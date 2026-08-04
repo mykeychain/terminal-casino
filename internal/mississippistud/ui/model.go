@@ -55,6 +55,11 @@ type Model struct {
 	// showPaytable toggles the full-screen paytable reference overlay (`?`). It is
 	// independent of the game Phase and can be pulled up at any time.
 	showPaytable bool
+
+	// animState is the presentation sub-state (see anim.go). boardShown is the
+	// number of card positions still on the felt during the board-clear sweep.
+	animState  animState
+	boardShown int
 }
 
 // New builds a model over an already-constructed game. newGame produces a fresh,
@@ -83,6 +88,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		return m.handleKey(msg)
 	}
+	if mm, cmd, handled := m.updateAnim(msg); handled {
+		return mm, cmd
+	}
 	return m, nil
 }
 
@@ -104,6 +112,15 @@ func (m Model) handleKey(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.showPaytable {
 		if key == "enter" || key == " " {
 			m.showPaytable = false
+		}
+		return m, nil
+	}
+
+	// While the board is being swept clear, input is locked — except enter/space,
+	// which skips straight to the next hand.
+	if m.animState == animClearing {
+		if key == "enter" || key == " " {
+			return m.finishClear()
 		}
 		return m, nil
 	}
@@ -261,12 +278,9 @@ func streetLabel(action, ante int) string {
 func (m Model) handleRoundOver(key string) (tea.Model, tea.Cmd) {
 	m = m.syncCursor("round-over", 1)
 	if key == "enter" || key == " " {
-		if err := m.game.NextHand(); err != nil {
-			m.msg = err.Error()
-		} else {
-			m.msg = ""
-			m.cursor = 0
-		}
+		// Sweep the settled hand off the felt before the next hand's betting
+		// screen; finishClear (once the sweep completes) advances the engine.
+		return m.startClear()
 	}
 	return m, nil
 }
@@ -376,21 +390,26 @@ func (m Model) renderTable(short bool) string {
 	if !m.dealt() {
 		return areaLabelStyle.Render("Your hand") + "  " + dimStyle.Render("set your ante and deal")
 	}
+	holeShown, communityShown := m.boardCounts()
 	return lipgloss.JoinVertical(lipgloss.Left,
-		m.renderCommunityArea(short),
+		m.renderCommunityArea(short, communityShown),
 		m.renderLedger(),
-		m.renderHoleArea(short),
+		m.renderHoleArea(short, holeShown),
 	)
 }
 
-func (m Model) renderHoleArea(short bool) string {
+func (m Model) renderHoleArea(short bool, shown int) string {
 	head := areaLabelStyle.Render("Your hand")
-	if status := m.holeStatus(); status != "" {
-		head += "  " + status
+	// The status (final hand name / made-hand hint) is hidden during the clear
+	// sweep, so the cards leave against a plain label.
+	if m.animState != animClearing {
+		if status := m.holeStatus(); status != "" {
+			head += "  " + status
+		}
 	}
 	hole := m.game.HoleCards()
 	cards := lipgloss.NewStyle().Height(tui.CardHeightFor(short)).
-		Render(tui.RenderHand(faces(hole), len(hole), m.compact(), short))
+		Render(tui.RenderHand(faces(hole), shown, m.compact(), short))
 	return head + "\n" + cards
 }
 
@@ -408,24 +427,33 @@ func (m Model) holeStatus() string {
 	return m.madeHandHint()
 }
 
-func (m Model) renderCommunityArea(short bool) string {
+func (m Model) renderCommunityArea(short bool, shown int) string {
 	community := m.game.CommunityCards()
-	faceUp := revealedCount(community)
+	revealed := revealedCount(community)
+	faceUp := revealed
+	if faceUp > shown {
+		faceUp = shown
+	}
 
-	label := areaLabelStyle.Render("Community")
-	var status string
-	switch {
-	case faceUp == 0:
-		status = dimStyle.Render("all face down")
-	case faceUp < numCommunity:
-		status = dimStyle.Render(fmt.Sprintf("%d of %d revealed", faceUp, numCommunity))
-	default:
-		status = dimStyle.Render("all revealed")
+	head := areaLabelStyle.Render("Community")
+	// The reveal-status note is hidden during the clear sweep, so the cards leave
+	// against a plain label.
+	if m.animState != animClearing {
+		var status string
+		switch {
+		case revealed == 0:
+			status = dimStyle.Render("all face down")
+		case revealed < numCommunity:
+			status = dimStyle.Render(fmt.Sprintf("%d of %d revealed", revealed, numCommunity))
+		default:
+			status = dimStyle.Render("all revealed")
+		}
+		head += "  " + status
 	}
 
 	cards := lipgloss.NewStyle().Height(tui.CardHeightFor(short)).
-		Render(tui.RenderSlots(communityFaces(community), faceUp, numCommunity, m.compact(), short))
-	return label + "  " + status + "\n" + cards
+		Render(tui.RenderSlots(communityFaces(community), faceUp, shown, m.compact(), short))
+	return head + "\n" + cards
 }
 
 // renderLedger is the running-total display — the heart of Mississippi Stud. It
@@ -474,6 +502,11 @@ func (m Model) renderBottom() string {
 	if m.game.Phase() == engine.PhaseRoundOver {
 		parts = append(parts, m.renderSettlement()) // the payout details…
 		parts = append(parts, m.renderBanner())     // …then the win / push / loss headline
+	}
+	// While the felt is being swept clear the result stays up, but the action bar
+	// is dropped — input is locked until the next hand's betting screen appears.
+	if m.animState == animClearing {
+		return lipgloss.JoinVertical(lipgloss.Left, parts...)
 	}
 	if m.msg != "" {
 		parts = append(parts, dimStyle.Render(m.msg))
