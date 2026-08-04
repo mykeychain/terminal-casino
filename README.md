@@ -2,8 +2,10 @@
 
 A terminal casino with rendered cards, built with [Bubble Tea](https://github.com/charmbracelet/bubbletea)
 and [Lip Gloss](https://github.com/charmbracelet/lipgloss). Connect (locally or over SSH),
-pick a table from the lobby, and play. Today's table is **3:2 Blackjack** — classic 3:2
-rules with up to three hands, split, double, and insurance.
+pick a table from the lobby, and play. The lobby offers **3:2 Blackjack** (classic 3:2
+rules with up to three hands, split, double, and insurance), **3-Card Poker**, and
+**Mississippi Stud** (a fold-or-raise stud game paid on your total wagered — see
+[`internal/mississippistud/README.md`](internal/mississippistud/README.md)).
 
 Each session is independent: a fresh $1000 bankroll, no accounts, no persistence
 (bankroll resets when you leave). The game engine is a pure, UI-agnostic Go package;
@@ -124,6 +126,9 @@ terminal-casino/
         game.go               state machine, actions, peek/H17, settlement/payouts
         *_test.go             engine unit tests
       ui/                     Bubble Tea model/update/view + card rendering
+    poker3card/               "3-Card Poker" — Ante/Play vs. dealer + Pair Plus (adapter → game.Game)
+    mississippistud/          "Mississippi Stud" — fold/raise across three streets, paid on total wagered (see its README)
+    tui/                      shared card rendering + chrome reused across games
 ```
 
 The engine holds all mutable state on the `Game` value (no global/package state) and

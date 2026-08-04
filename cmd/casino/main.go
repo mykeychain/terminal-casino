@@ -12,6 +12,7 @@ import (
 	"github.com/mykeychain/terminal-casino/internal/blackjack32"
 	"github.com/mykeychain/terminal-casino/internal/casino"
 	"github.com/mykeychain/terminal-casino/internal/game"
+	"github.com/mykeychain/terminal-casino/internal/mississippistud"
 	"github.com/mykeychain/terminal-casino/internal/poker3card"
 	"github.com/mykeychain/terminal-casino/internal/theme"
 )
@@ -24,6 +25,7 @@ func main() {
 	games := []game.Game{
 		blackjack32.Game(),
 		poker3card.Game(),
+		mississippistud.Game(),
 	}
 
 	p := tea.NewProgram(casino.NewApp(games), tea.WithAltScreen())
