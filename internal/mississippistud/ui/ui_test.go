@@ -359,3 +359,20 @@ func TestRaiseOnlyOffersLegalMultiples(t *testing.T) {
 		t.Fatalf("illegal 2x raise advanced the phase to %v", m.game.Phase())
 	}
 }
+
+// TestBoardClearsOnNextHand checks that choosing "Next hand" returns to a clean
+// betting screen — the settled hand's community and hole cards are gone, not left
+// lingering on the felt.
+func TestBoardClearsOnNextHand(t *testing.T) {
+	m := sized(t, newTestModel(1000, flushDeck()), 100, 30)
+	m, _ = upd(t, m, keyEnter) // deal
+	m = raiseAllStreets(t, m)  // settle
+	m, _ = upd(t, m, keyEnter) // Next hand -> betting
+	if m.game.Phase() != engine.PhaseBetting {
+		t.Fatalf("after Next hand: phase = %v, want betting", m.game.Phase())
+	}
+	view := stripANSI(m.View())
+	if strings.Contains(view, "Community") || strings.Contains(view, "▚") {
+		t.Fatalf("board not cleared on the new-hand betting screen:\n%s", view)
+	}
+}

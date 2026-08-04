@@ -334,6 +334,25 @@ func TestNextHandCarriesAnte(t *testing.T) {
 	}
 }
 
+func TestNextHandClearsBoard(t *testing.T) {
+	g := NewGameWithDeck(1000, sampleDeck())
+	mustDeal(t, g)
+	mustRaise(t, g, 1)
+	mustRaise(t, g, 1)
+	mustRaise(t, g, 1)
+	if err := g.NextHand(); err != nil {
+		t.Fatal(err)
+	}
+	// The betting screen for the next hand starts with a clean board: no hole or
+	// community cards linger from the settled hand.
+	if got := g.HoleCards(); got != nil {
+		t.Errorf("hole cards after NextHand = %v, want none", got)
+	}
+	if got := g.CommunityCards(); got != nil {
+		t.Errorf("community cards after NextHand = %v, want none", got)
+	}
+}
+
 func TestNextHandClampsAnteToBankroll(t *testing.T) {
 	// Lose the whole ante down to a bankroll below the carried ante.
 	g := NewGameWithDeck(60, sampleDeck())

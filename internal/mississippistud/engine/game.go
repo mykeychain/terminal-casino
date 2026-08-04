@@ -223,7 +223,7 @@ func (g *Game) TotalWagered() int {
 }
 
 // HoleCards returns a copy of the two face-up hole cards, or an empty slice
-// before the first Deal.
+// while no hand is in progress (during betting, before a hand is dealt).
 func (g *Game) HoleCards() []Card {
 	if !g.dealt {
 		return nil
@@ -232,7 +232,8 @@ func (g *Game) HoleCards() []Card {
 }
 
 // CommunityCards returns a copy of the three community cards, each tagged with
-// whether it has been revealed. Empty before the first Deal.
+// whether it has been revealed. Empty while no hand is in progress (during
+// betting, before a hand is dealt).
 func (g *Game) CommunityCards() []CommunityCard {
 	if !g.dealt {
 		return nil
@@ -476,7 +477,9 @@ func highestPairRank(cards []Card) (Rank, bool) {
 
 // NextHand advances from a settled hand to the next bet, or to game over when
 // the bankroll can no longer cover the minimum bet. The previous Ante carries
-// over, clamped down to what the bankroll still affords.
+// over, clamped down to what the bankroll still affords. The last hand's cards
+// are cleared so the betting screen starts with a clean board, identical to the
+// state before the very first deal.
 func (g *Game) NextHand() error {
 	if g.phase != PhaseRoundOver {
 		return ErrWrongPhase
@@ -498,6 +501,9 @@ func (g *Game) NextHand() error {
 	g.ante = ante
 	g.streetBets = [numStreets]int{}
 	g.revealed = [numStreets]bool{}
+	g.holeCards = [2]Card{}
+	g.community = [numStreets]Card{}
+	g.dealt = false
 	g.phase = PhaseBetting
 	return nil
 }
