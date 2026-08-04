@@ -368,30 +368,44 @@ func (m Model) renderHeader() string {
 	return strings.Join(parts, "    ")
 }
 
-// renderTable builds the flexible middle zone — the hole cards over the community
-// row, the wager ledger, and the subtle made-hand hint — at the requested
-// vertical density.
+// renderTable builds the flexible middle zone at the requested vertical density:
+// the community board on top, the running-total ledger in the middle, and the
+// player's own hand at the bottom (closest to the player), mirroring the
+// board-over-hand layout the other tables use for dealer-over-player.
 func (m Model) renderTable(short bool) string {
 	if !m.dealt() {
 		return areaLabelStyle.Render("Your hand") + "  " + dimStyle.Render("set your ante and deal")
 	}
-	rows := []string{
-		m.renderHoleArea(short),
+	return lipgloss.JoinVertical(lipgloss.Left,
 		m.renderCommunityArea(short),
 		m.renderLedger(),
-	}
-	if hint := m.madeHandHint(); hint != "" {
-		rows = append(rows, hint)
-	}
-	return lipgloss.JoinVertical(lipgloss.Left, rows...)
+		m.renderHoleArea(short),
+	)
 }
 
 func (m Model) renderHoleArea(short bool) string {
-	label := areaLabelStyle.Render("Your hand")
+	head := areaLabelStyle.Render("Your hand")
+	if status := m.holeStatus(); status != "" {
+		head += "  " + status
+	}
 	hole := m.game.HoleCards()
 	cards := lipgloss.NewStyle().Height(tui.CardHeightFor(short)).
 		Render(tui.RenderHand(faces(hole), len(hole), m.compact(), short))
-	return label + "\n" + cards
+	return head + "\n" + cards
+}
+
+// holeStatus is the note shown beside the hole-card label. At showdown it names
+// the final five-card hand (as the other tables name the player's hand); during
+// play it carries the subtle made-hand floor hint, or nothing when no floor is
+// locked yet.
+func (m Model) holeStatus() string {
+	if m.game.Phase() == engine.PhaseRoundOver {
+		if s := m.game.Result(); !s.Folded && s.HandName != "" {
+			return nameStyle.Render(s.HandName)
+		}
+		return ""
+	}
+	return m.madeHandHint()
 }
 
 func (m Model) renderCommunityArea(short bool) string {
@@ -458,8 +472,8 @@ func (m Model) madeHandHint() string {
 func (m Model) renderBottom() string {
 	var parts []string
 	if m.game.Phase() == engine.PhaseRoundOver {
-		parts = append(parts, m.renderBanner())
-		parts = append(parts, m.renderSettlement())
+		parts = append(parts, m.renderSettlement()) // the payout details…
+		parts = append(parts, m.renderBanner())     // …then the win / push / loss headline
 	}
 	if m.msg != "" {
 		parts = append(parts, dimStyle.Render(m.msg))
@@ -479,7 +493,8 @@ func (m Model) renderBanner() string {
 	var style lipgloss.Style
 	switch s.Outcome {
 	case engine.OutcomeWin:
-		text, style = fmt.Sprintf("YOU WIN +$%d", s.Net), winStyle
+		// Blink the win headline, matching the other tables' result banner.
+		text, style = fmt.Sprintf("YOU WIN +$%d", s.Net), winStyle.Blink(true)
 	case engine.OutcomePush:
 		text, style = "PUSH", pushStyle
 	default:
@@ -515,33 +530,7 @@ func (m Model) renderSettlement() string {
 			loseStyle.Render("loses"),
 			dimStyle.Render(fmt.Sprintf("— $%d forfeited", s.TotalWagered)))
 	}
-	net := netStyle(s.Net).Render(fmt.Sprintf("Net %s", signed(s.Net)))
-	return tui.HandIndent + line + "\n" + tui.HandIndent + net
-}
-
-// netStyle picks the color for a net figure: green positive, grey zero, red
-// negative.
-func netStyle(net int) lipgloss.Style {
-	switch {
-	case net > 0:
-		return winStyle
-	case net < 0:
-		return loseStyle
-	default:
-		return pushStyle
-	}
-}
-
-// signed formats a money delta with an explicit sign (+$5, -$3, $0).
-func signed(n int) string {
-	switch {
-	case n > 0:
-		return fmt.Sprintf("+$%d", n)
-	case n < 0:
-		return fmt.Sprintf("-$%d", -n)
-	default:
-		return "$0"
-	}
+	return tui.HandIndent + line
 }
 
 // ---- Action bar ----
