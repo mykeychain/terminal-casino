@@ -22,12 +22,13 @@ var AnteBonusMultipliers = map[HandCategory]int{
 // dealt hand alone, independent of the dealer and of fold/play. Anything below a
 // pair (a High Card) is absent and loses.
 //
-// Straight Flush 40:1, Three of a Kind 30:1, Straight 6:1, Flush 3:1, Pair 1:1.
+// Straight Flush 40:1, Three of a Kind 30:1, Straight 6:1, Flush 4:1, Pair 1:1
+// (the classic/original Pair Plus table).
 var PairPlusMultipliers = map[HandCategory]int{
 	StraightFlush: 40,
 	ThreeOfAKind:  30,
 	Straight:      6,
-	Flush:         3,
+	Flush:         4,
 	Pair:          1,
 }
 
