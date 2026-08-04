@@ -55,8 +55,8 @@ func (m Model) renderPaytable() string {
 
 	cols := lipgloss.JoinHorizontal(lipgloss.Top, pairPlus, "     ", anteBonus)
 	notes := lipgloss.JoinVertical(lipgloss.Left,
-		dimStyle.Render("Pair Plus pays on your three cards alone — win or lose the hand."),
-		dimStyle.Render("The Ante Bonus pays these strong hands even if the dealer beats you."),
+		dimStyle.Render("Pair Plus pays on your three cards alone."),
+		dimStyle.Render("Ante Bonus pays even if the dealer beats you."),
 	)
 	return titledBox("Paytable", cols+"\n\n"+notes)
 }

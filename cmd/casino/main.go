@@ -1,6 +1,6 @@
 // Command casino runs the local casino TUI: a lobby / game-selector that launches
-// the registered games (today: 3:2 Blackjack). Both this local binary and the SSH
-// server land in the same lobby.
+// the registered games (3:2 Blackjack and 3-Card Poker). Both this local binary
+// and the SSH server land in the same lobby.
 package main
 
 import (
@@ -12,6 +12,7 @@ import (
 	"github.com/mykeychain/terminal-casino/internal/blackjack32"
 	"github.com/mykeychain/terminal-casino/internal/casino"
 	"github.com/mykeychain/terminal-casino/internal/game"
+	"github.com/mykeychain/terminal-casino/internal/poker3card"
 	"github.com/mykeychain/terminal-casino/internal/theme"
 )
 
@@ -22,6 +23,7 @@ func main() {
 
 	games := []game.Game{
 		blackjack32.Game(),
+		poker3card.Game(),
 	}
 
 	p := tea.NewProgram(casino.NewApp(games), tea.WithAltScreen())
