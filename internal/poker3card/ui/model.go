@@ -53,6 +53,10 @@ type Model struct {
 	// msg is a transient status line (e.g. a rejected bet).
 	msg string
 
+	// showPaytable toggles the full-screen paytable reference overlay (`?`). It is
+	// independent of the game Phase and can be pulled up at any time.
+	showPaytable bool
+
 	// ---- Feel-tier animation sub-state (independent of the engine Phase) ----
 	animState animState
 
@@ -108,6 +112,20 @@ func (m Model) handleKey(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Global quit. Esc is intentionally NOT handled: the lobby intercepts it.
 	if key == "q" || key == "ctrl+c" {
 		return m, tea.Quit
+	}
+
+	// Paytable overlay: `?` toggles it from any phase (even mid-animation). While
+	// it is up it acts as a modal — enter/space (or `?`) dismisses it and every
+	// other key is swallowed so nothing acts behind it.
+	if key == "?" {
+		m.showPaytable = !m.showPaytable
+		return m, nil
+	}
+	if m.showPaytable {
+		if key == "enter" || key == " " {
+			m.showPaytable = false
+		}
+		return m, nil
 	}
 
 	// Input is locked while an animation runs (except quit). During the result
@@ -369,6 +387,9 @@ func (m Model) compact() bool {
 // first WindowSizeMsg it falls back to simple top-to-bottom stacking.
 func (m Model) View() string {
 	f := m.frame()
+	if m.showPaytable {
+		return m.viewPaytable(f)
+	}
 	if m.width == 0 || m.height == 0 {
 		return m.viewStacked(f)
 	}
@@ -657,7 +678,7 @@ func (m Model) renderActionBar() string {
 		if !m.game.CanPlay() {
 			body += "\n" + dimStyle.Render("Not enough bankroll to Play — Fold only.")
 		}
-		hint = "← → choose · p play · f fold · enter confirm · q quit"
+		hint = "← → choose · p play · f fold · enter confirm · ? paytable · q quit"
 	case engine.PhaseRoundOver:
 		title = "Round over"
 		body = renderMenu([]string{"Next hand"}, 0)
@@ -709,6 +730,7 @@ func (m Model) bettingHint() string {
 		fmt.Sprintf("↑ ↓ ±$%d", coarseBetStep),
 		"tab ⇄ switch",
 		"enter deal",
+		"? paytable",
 		"q quit",
 	}
 	return strings.Join(parts, " · ")

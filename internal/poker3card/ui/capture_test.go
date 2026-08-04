@@ -38,6 +38,14 @@ func TestCaptureFrames(t *testing.T) {
 		write("betting", m.View())
 	}
 
+	// 1b. Paytable overlay (`?`) pulled up from the betting screen.
+	{
+		m := newTestModel(1000, 9, 6, scenarioBigWin())
+		m, _ = upd(t, m, size)
+		m, _ = upd(t, m, keyRune('?'))
+		write("paytable", m.View())
+	}
+
 	// 2. Decision — deal complete, player face up / dealer face down, Play/Fold.
 	{
 		m := newTestModel(1000, 9, 6, scenarioBigWin())
