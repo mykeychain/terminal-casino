@@ -264,7 +264,7 @@ func TestPairPlusPayTable(t *testing.T) {
 		{"straight flush", h(c(Nine, Spades), c(Eight, Spades), c(Seven, Spades)), 4000, true},
 		{"trips", h(c(Seven, Spades), c(Seven, Hearts), c(Seven, Clubs)), 3000, true},
 		{"straight", h(c(Nine, Spades), c(Eight, Hearts), c(Seven, Clubs)), 600, true},
-		{"flush", h(c(King, Diamonds), c(Nine, Diamonds), c(Two, Diamonds)), 300, true},
+		{"flush", h(c(King, Diamonds), c(Nine, Diamonds), c(Two, Diamonds)), 400, true},
 		{"pair", h(c(King, Spades), c(King, Hearts), c(Three, Clubs)), 100, true},
 		{"high card loses", h(c(King, Spades), c(Nine, Hearts), c(Two, Clubs)), -100, false},
 	}
