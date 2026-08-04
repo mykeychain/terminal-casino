@@ -6,6 +6,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/mykeychain/terminal-casino/internal/poker3card/engine"
+	"github.com/mykeychain/terminal-casino/internal/tui"
 )
 
 // The paytable overlay is a reference the player can pull up at any time with
@@ -43,7 +44,7 @@ func (m Model) viewPaytable(f revealFrame) string {
 	middle := lipgloss.Place(m.width, middleH, lipgloss.Center, lipgloss.Center, panel)
 
 	body := lipgloss.JoinVertical(lipgloss.Left, top, middle, hint)
-	body = fitHeight(body, m.height)
+	body = tui.FitHeight(body, m.height)
 	return lipgloss.NewStyle().Width(m.width).Render(body)
 }
 
@@ -58,7 +59,7 @@ func (m Model) renderPaytable() string {
 		dimStyle.Render("Pair Plus pays on your three cards alone."),
 		dimStyle.Render("Ante Bonus pays even if the dealer beats you."),
 	)
-	return titledBox("Paytable", cols+"\n\n"+notes)
+	return tui.TitledBox("Paytable", cols+"\n\n"+notes)
 }
 
 // paytableColumn renders one titled payout column: its heading, then each paying

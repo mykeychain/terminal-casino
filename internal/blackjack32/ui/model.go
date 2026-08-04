@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/mykeychain/terminal-casino/internal/blackjack32/engine"
+	"github.com/mykeychain/terminal-casino/internal/tui"
 )
 
 // compactWidthThreshold: below this terminal width, or with more than two hands,
@@ -140,23 +141,12 @@ func (m Model) syncCursor(sig string, n int) Model {
 		m.menuSig = sig
 		m.cursor = 0
 	}
-	m.cursor = clampIdx(m.cursor, n)
+	m.cursor = tui.ClampIdx(m.cursor, n)
 	return m
 }
 
-// clampIdx pins i into [0, n) (returns 0 for an empty menu).
-func clampIdx(i, n int) int {
-	if n <= 0 || i < 0 {
-		return 0
-	}
-	if i >= n {
-		return n - 1
-	}
-	return i
-}
-
 func (m Model) handleBetting(key string) (tea.Model, tea.Cmd) {
-	m.focusedSpot = clampIdx(m.focusedSpot, m.game.NumSpots())
+	m.focusedSpot = tui.ClampIdx(m.focusedSpot, m.game.NumSpots())
 	switch key {
 	case "right":
 		m.adjustBet(engine.BetIncrement)
@@ -185,7 +175,7 @@ func (m Model) handleBetting(key string) (tea.Model, tea.Cmd) {
 		if err := m.game.RemoveSpot(m.focusedSpot); err != nil {
 			m.msg = "cannot remove hand: " + err.Error()
 		} else {
-			m.focusedSpot = clampIdx(m.focusedSpot, m.game.NumSpots())
+			m.focusedSpot = tui.ClampIdx(m.focusedSpot, m.game.NumSpots())
 			m.msg = ""
 		}
 	case "enter", " ":
@@ -410,12 +400,12 @@ func (m Model) View() string {
 	if lipgloss.Height(middle) > middleH {
 		middle = m.renderTable(f, true)
 	}
-	middleRegion := fitHeight(middle, middleH)
+	middleRegion := tui.FitHeight(middle, middleH)
 
 	body := lipgloss.JoinVertical(lipgloss.Left, top, middleRegion, bottom)
 	// Guard: force exact terminal height even if the chrome alone exceeds it (a
 	// terminal too short for the panels — the min-size guard is out of scope).
-	body = fitHeight(body, m.height)
+	body = tui.FitHeight(body, m.height)
 	return lipgloss.NewStyle().Width(m.width).Render(body)
 }
 
@@ -473,23 +463,6 @@ func (m Model) renderBottom(f revealFrame) string {
 	return lipgloss.JoinVertical(lipgloss.Left, parts...)
 }
 
-// fitHeight pads s with blank lines (top-aligned) up to h rows, or clips it to
-// the first h rows when it is taller. It is how the middle region is sized to the
-// flex space and how the whole frame is forced to exactly m.height.
-func fitHeight(s string, h int) string {
-	if h <= 0 {
-		return ""
-	}
-	lines := strings.Split(s, "\n")
-	if len(lines) > h {
-		lines = lines[:h]
-	}
-	for len(lines) < h {
-		lines = append(lines, "")
-	}
-	return strings.Join(lines, "\n")
-}
-
 func (m Model) renderDealerArea(f revealFrame, short bool) string {
 	dv := m.game.Dealer()
 	label := areaLabelStyle.Render("Dealer")
@@ -518,7 +491,7 @@ func (m Model) renderDealerArea(f revealFrame, short bool) string {
 	// Reserve a fixed-height card row so the layout doesn't jump as the dealer's
 	// cards cascade in — the row is blank space until the up-card lands. The row
 	// height tracks the chosen density (5 rows full, 3 rows compact).
-	cards := lipgloss.NewStyle().Height(cardHeightFor(short)).Render(renderDealerHandFrame(dv, f, m.compact(), short))
+	cards := lipgloss.NewStyle().Height(tui.CardHeightFor(short)).Render(tui.RenderSlots(faces(dv.Cards), f.dealerFaceUp, f.dealerCards, m.compact(), short))
 	return label + "  " + status + "\n" + cards
 }
 
@@ -579,7 +552,7 @@ func (m Model) renderHandBlock(idx int, h engine.HandView, multi, roundOver bool
 
 	// Reserve a fixed-height card row so a hand block keeps its height as its cards
 	// cascade in (blank until the first card lands), preventing vertical jumping.
-	cards := lipgloss.NewStyle().Height(cardHeightFor(short)).Render(renderHandCount(h.Cards, count, m.compact(), short))
+	cards := lipgloss.NewStyle().Height(tui.CardHeightFor(short)).Render(tui.RenderHand(faces(h.Cards), count, m.compact(), short))
 
 	// Show the hand total only once every card in this hand is on the table, so
 	// the deal cascade does not spoil a not-yet-complete total.
@@ -659,7 +632,7 @@ func (m Model) renderActionBar() string {
 		body = dimStyle.Render(fmt.Sprintf("Dealer shows an Ace — insure Hand %d for ", handNo)) +
 			insuranceCostStyle.Render(fmt.Sprintf(" $%d ", half)) +
 			dimStyle.Render(" ?") +
-			"\n" + renderMenu([]string{"Yes", "No"}, clampIdx(m.cursor, 2))
+			"\n" + tui.RenderMenu([]string{"Yes", "No"}, tui.ClampIdx(m.cursor, 2))
 		hint = "← → choose · enter confirm · q quit"
 	case engine.PhasePlayerTurn:
 		title = "Your move"
@@ -668,18 +641,18 @@ func (m Model) renderActionBar() string {
 		for i, a := range actions {
 			labels[i] = actionLabel(a)
 		}
-		body = renderMenu(labels, clampIdx(m.cursor, len(actions)))
+		body = tui.RenderMenu(labels, tui.ClampIdx(m.cursor, len(actions)))
 		hint = "← → choose · enter confirm · q quit"
 	case engine.PhaseRoundOver:
 		title = "Round over"
-		body = renderMenu([]string{"Next hand"}, 0)
+		body = tui.RenderMenu([]string{"Next hand"}, 0)
 		hint = "enter continue · q quit"
 	case engine.PhaseGameOver:
 		title = "Game over"
-		body = renderMenu([]string{"Restart", "Quit"}, clampIdx(m.cursor, 2))
+		body = tui.RenderMenu([]string{"Restart", "Quit"}, tui.ClampIdx(m.cursor, 2))
 		hint = "← → choose · enter confirm · q quit"
 	}
-	return titledBox(title, body) + "\n " + dimStyle.Render(hint)
+	return tui.TitledBox(title, body) + "\n " + dimStyle.Render(hint)
 }
 
 // renderBettingPanel builds the betting panel's title and body. One opened hand
@@ -716,7 +689,7 @@ func (m Model) renderBetTiles() string {
 		if vw := lipgloss.Width(value); vw > w {
 			w = vw
 		}
-		inner := center(label, w) + "\n" + center(value, w)
+		inner := tui.Center(label, w) + "\n" + tui.Center(value, w)
 		if i == m.focusedSpot {
 			tiles[i] = focusedTileStyle.Render(inner)
 		} else {
@@ -745,60 +718,6 @@ func (m Model) bettingHint() string {
 	}
 	parts = append(parts, "enter deal", "q quit")
 	return strings.Join(parts, " · ")
-}
-
-// titledBox draws a rounded panel around content with a label embedded in the top
-// border. Content may contain ANSI styling and span multiple lines; widths are
-// measured with lipgloss.Width so styled menu pills still align.
-func titledBox(title, content string) string {
-	lines := strings.Split(content, "\n")
-	inner := 0
-	for _, l := range lines {
-		if w := lipgloss.Width(l); w > inner {
-			inner = w
-		}
-	}
-	titleW := lipgloss.Width(title)
-	if need := titleW + 2; need > inner { // keep the title from overflowing the top border
-		inner = need
-	}
-	interior := inner + 2 // one space of padding on each side
-	dashes := interior - (titleW + 3)
-	if dashes < 0 {
-		dashes = 0
-	}
-
-	var sb strings.Builder
-	sb.WriteString(panelBorderStyle.Render("╭─ ") + panelTitleStyle.Render(title) +
-		panelBorderStyle.Render(" "+strings.Repeat("─", dashes)+"╮"))
-	sb.WriteString("\n")
-	for _, l := range lines {
-		pad := inner - lipgloss.Width(l)
-		if pad < 0 {
-			pad = 0
-		}
-		sb.WriteString(panelBorderStyle.Render("│ ") + l + strings.Repeat(" ", pad) +
-			panelBorderStyle.Render(" │") + "\n")
-	}
-	sb.WriteString(panelBorderStyle.Render("╰" + strings.Repeat("─", interior) + "╯"))
-	return sb.String()
-}
-
-// renderMenu lays a set of labels out horizontally, highlighting the selected one
-// in gold.
-func renderMenu(labels []string, selected int) string {
-	if len(labels) == 0 {
-		return ""
-	}
-	parts := make([]string, len(labels))
-	for i, l := range labels {
-		if i == selected {
-			parts[i] = menuSelectedStyle.Render(l)
-		} else {
-			parts[i] = menuUnselectedStyle.Render(l)
-		}
-	}
-	return lipgloss.JoinHorizontal(lipgloss.Top, parts...)
 }
 
 // actionLabel maps a legal engine action to its menu label.

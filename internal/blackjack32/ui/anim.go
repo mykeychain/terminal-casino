@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/mykeychain/terminal-casino/internal/blackjack32/engine"
+	"github.com/mykeychain/terminal-casino/internal/tui"
 )
 
 // animState is the UI's presentation sub-state, independent of the engine Phase.
@@ -344,7 +345,7 @@ func (m Model) renderBanner() string {
 	}
 	// Two indented lines (aligned with the hand rows): the outcome, then the
 	// player's bankroll — value only, no label — which ticks during animResult.
-	outcome := handIndent + style.Render(text)
-	bankroll := handIndent + base.Render(fmt.Sprintf("$%d", m.displayBankroll))
+	outcome := tui.HandIndent + style.Render(text)
+	bankroll := tui.HandIndent + base.Render(fmt.Sprintf("$%d", m.displayBankroll))
 	return outcome + "\n" + bankroll
 }

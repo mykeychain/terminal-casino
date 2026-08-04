@@ -1,8 +1,6 @@
 // Package theme holds the shared casino color palette as exported lipgloss
-// colors. The values mirror the approved blackjack palette (see
-// internal/blackjack32/ui/styles.go); the lobby and future shared chrome use
-// them. blackjack32's own styles.go intentionally keeps its private copy for
-// now, so a little duplication is expected.
+// colors. It is the single source of truth for color: the lobby, the shared
+// internal/tui chrome, and every game's styles source their colors here.
 package theme
 
 import (
@@ -34,6 +32,9 @@ var (
 	Red = lipgloss.Color("#D64545")
 	// SoftWhite — primary borders and body text.
 	SoftWhite = lipgloss.Color("#C9CDD2")
+	// CardPip — rank + glyph on a black suit (♠ ♣); a touch brighter than the
+	// SoftWhite border so the pip reads clearly against it.
+	CardPip = lipgloss.Color("#E8EAED")
 	// Dim — secondary / hint text.
 	Dim = lipgloss.Color("#8B949E")
 	// Slate — muted fills (e.g. card-back hatch).

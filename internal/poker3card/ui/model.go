@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/mykeychain/terminal-casino/internal/poker3card/engine"
+	"github.com/mykeychain/terminal-casino/internal/tui"
 )
 
 // compactWidthThreshold: below this terminal width, cards are packed edge-to-edge
@@ -160,25 +161,14 @@ func (m Model) syncCursor(sig string, n int) Model {
 		m.menuSig = sig
 		m.cursor = 0
 	}
-	m.cursor = clampIdx(m.cursor, n)
+	m.cursor = tui.ClampIdx(m.cursor, n)
 	return m
-}
-
-// clampIdx pins i into [0, n) (returns 0 for an empty menu).
-func clampIdx(i, n int) int {
-	if n <= 0 || i < 0 {
-		return 0
-	}
-	if i >= n {
-		return n - 1
-	}
-	return i
 }
 
 // ---- Betting ----
 
 func (m Model) handleBetting(key string) (tea.Model, tea.Cmd) {
-	m.focusedSpot = clampIdx(m.focusedSpot, numSpots)
+	m.focusedSpot = tui.ClampIdx(m.focusedSpot, numSpots)
 	switch key {
 	case "right":
 		m.adjustBet(engine.MinBet)
@@ -407,10 +397,10 @@ func (m Model) View() string {
 	if lipgloss.Height(middle) > middleH {
 		middle = m.renderTable(f, true)
 	}
-	middleRegion := fitHeight(middle, middleH)
+	middleRegion := tui.FitHeight(middle, middleH)
 
 	body := lipgloss.JoinVertical(lipgloss.Left, top, middleRegion, bottom)
-	body = fitHeight(body, m.height)
+	body = tui.FitHeight(body, m.height)
 	return lipgloss.NewStyle().Width(m.width).Render(body)
 }
 
@@ -493,7 +483,7 @@ func (m Model) renderDealerArea(f revealFrame, short bool) string {
 	if f.dealerCards == 0 {
 		return label + "  " + status
 	}
-	cards := lipgloss.NewStyle().Height(cardHeightFor(short)).Render(renderDealerHandFrame(dv, f, m.compact(), short))
+	cards := lipgloss.NewStyle().Height(tui.CardHeightFor(short)).Render(tui.RenderSlots(faces(dv.Cards), f.dealerFaceUp, f.dealerCards, m.compact(), short))
 	return label + "  " + status + "\n" + cards
 }
 
@@ -510,7 +500,7 @@ func (m Model) renderPlayerArea(f revealFrame, short bool) string {
 	} else {
 		status = dimStyle.Render("dealing…")
 	}
-	cards := lipgloss.NewStyle().Height(cardHeightFor(short)).Render(renderHandCount(pv.Cards, f.playerCards, m.compact(), short))
+	cards := lipgloss.NewStyle().Height(tui.CardHeightFor(short)).Render(tui.RenderHand(faces(pv.Cards), f.playerCards, m.compact(), short))
 	return label + "  " + status + "\n" + cards
 }
 
@@ -536,22 +526,6 @@ func (m Model) renderBottom(f revealFrame) string {
 	return lipgloss.JoinVertical(lipgloss.Left, parts...)
 }
 
-// fitHeight pads s with blank lines (top-aligned) up to h rows, or clips it to
-// the first h rows when it is taller.
-func fitHeight(s string, h int) string {
-	if h <= 0 {
-		return ""
-	}
-	lines := strings.Split(s, "\n")
-	if len(lines) > h {
-		lines = lines[:h]
-	}
-	for len(lines) < h {
-		lines = append(lines, "")
-	}
-	return strings.Join(lines, "\n")
-}
-
 // ---- Result banner + settlement breakdown ----
 
 // renderBanner builds the centered result headline for the settled round from
@@ -573,8 +547,8 @@ func (m Model) renderBanner() string {
 	if win {
 		style = style.Blink(true)
 	}
-	outcome := handIndent + style.Render(text)
-	bankroll := handIndent + base.Render(fmt.Sprintf("$%d", m.displayBankroll))
+	outcome := tui.HandIndent + style.Render(text)
+	bankroll := tui.HandIndent + base.Render(fmt.Sprintf("$%d", m.displayBankroll))
 	return outcome + "\n" + bankroll
 }
 
@@ -602,7 +576,7 @@ func (m Model) renderSettlement() string {
 		lines = append(lines, componentLine("Play", s.Play))
 	}
 	if s.AnteBonus.Applies {
-		lines = append(lines, handIndent+bonusStyle.Render(
+		lines = append(lines, tui.HandIndent+bonusStyle.Render(
 			fmt.Sprintf("Ante Bonus (%s)  +$%d", s.AnteBonus.Category.String(), s.AnteBonus.Net)))
 	}
 	if s.PairPlus.Bet > 0 {
@@ -610,7 +584,7 @@ func (m Model) renderSettlement() string {
 	}
 
 	net := netStyle(s.Net).Render(fmt.Sprintf("Net %s", signed(s.Net)))
-	lines = append(lines, handIndent+net)
+	lines = append(lines, tui.HandIndent+net)
 	return strings.Join(lines, "\n")
 }
 
@@ -628,7 +602,7 @@ func componentLine(label string, c engine.ComponentResult) string {
 	default:
 		delta = dimStyle.Render("—")
 	}
-	return handIndent + fmt.Sprintf("%-10s %s  %s",
+	return tui.HandIndent + fmt.Sprintf("%-10s %s  %s",
 		label, dimStyle.Render(fmt.Sprintf("$%d", c.Bet)), delta)
 }
 
@@ -674,21 +648,21 @@ func (m Model) renderActionBar() string {
 		for i, a := range actions {
 			labels[i] = decisionLabel(a)
 		}
-		body = renderMenu(labels, clampIdx(m.cursor, len(actions)))
+		body = tui.RenderMenu(labels, tui.ClampIdx(m.cursor, len(actions)))
 		if !m.game.CanPlay() {
 			body += "\n" + dimStyle.Render("Not enough bankroll to Play — Fold only.")
 		}
 		hint = "← → choose · p play · f fold · enter confirm · ? paytable · q quit"
 	case engine.PhaseRoundOver:
 		title = "Round over"
-		body = renderMenu([]string{"Next hand"}, 0)
+		body = tui.RenderMenu([]string{"Next hand"}, 0)
 		hint = "enter continue · q quit"
 	case engine.PhaseGameOver:
 		title = "Game over"
-		body = renderMenu([]string{"Restart", "Quit"}, clampIdx(m.cursor, 2))
+		body = tui.RenderMenu([]string{"Restart", "Quit"}, tui.ClampIdx(m.cursor, 2))
 		hint = "← → choose · enter confirm · q quit"
 	}
-	return titledBox(title, body) + "\n " + dimStyle.Render(hint)
+	return tui.TitledBox(title, body) + "\n " + dimStyle.Render(hint)
 }
 
 // renderBetTiles lays out the Ante and Pair Plus wager tiles. The focused tile
@@ -708,7 +682,7 @@ func (m Model) renderBetTiles() string {
 		if vw := lipgloss.Width(value); vw > w {
 			w = vw
 		}
-		inner := center(labels[i], w) + "\n" + center(value, w)
+		inner := tui.Center(labels[i], w) + "\n" + tui.Center(value, w)
 		if i == m.focusedSpot {
 			tiles[i] = focusedTileStyle.Render(inner)
 		} else {
@@ -734,57 +708,4 @@ func (m Model) bettingHint() string {
 		"q quit",
 	}
 	return strings.Join(parts, " · ")
-}
-
-// titledBox draws a rounded panel around content with a label embedded in the
-// top border. Content may contain ANSI styling and span multiple lines.
-func titledBox(title, content string) string {
-	lines := strings.Split(content, "\n")
-	inner := 0
-	for _, l := range lines {
-		if w := lipgloss.Width(l); w > inner {
-			inner = w
-		}
-	}
-	titleW := lipgloss.Width(title)
-	if need := titleW + 2; need > inner {
-		inner = need
-	}
-	interior := inner + 2
-	dashes := interior - (titleW + 3)
-	if dashes < 0 {
-		dashes = 0
-	}
-
-	var sb strings.Builder
-	sb.WriteString(panelBorderStyle.Render("╭─ ") + panelTitleStyle.Render(title) +
-		panelBorderStyle.Render(" "+strings.Repeat("─", dashes)+"╮"))
-	sb.WriteString("\n")
-	for _, l := range lines {
-		pad := inner - lipgloss.Width(l)
-		if pad < 0 {
-			pad = 0
-		}
-		sb.WriteString(panelBorderStyle.Render("│ ") + l + strings.Repeat(" ", pad) +
-			panelBorderStyle.Render(" │") + "\n")
-	}
-	sb.WriteString(panelBorderStyle.Render("╰" + strings.Repeat("─", interior) + "╯"))
-	return sb.String()
-}
-
-// renderMenu lays a set of labels out horizontally, highlighting the selected
-// one in gold.
-func renderMenu(labels []string, selected int) string {
-	if len(labels) == 0 {
-		return ""
-	}
-	parts := make([]string, len(labels))
-	for i, l := range labels {
-		if i == selected {
-			parts[i] = menuSelectedStyle.Render(l)
-		} else {
-			parts[i] = menuUnselectedStyle.Render(l)
-		}
-	}
-	return lipgloss.JoinHorizontal(lipgloss.Top, parts...)
 }
