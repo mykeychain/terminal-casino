@@ -1,6 +1,7 @@
 package casino
 
 import (
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -194,5 +195,49 @@ func TestWindowSizeStored(t *testing.T) {
 	a = m.(App)
 	if a.width != 120 || a.height != 40 {
 		t.Fatalf("size not stored: got %dx%d", a.width, a.height)
+	}
+}
+
+// descGame is a game.Game with a custom description, for exercising tile wrapping.
+type descGame struct {
+	title, desc string
+}
+
+func (g descGame) Title() string          { return g.title }
+func (g descGame) Description() string    { return g.desc }
+func (g descGame) New(w, h int) tea.Model { return stubModel{} }
+
+func TestLobbyViewRenders(t *testing.T) {
+	longDesc := "Mississippi Stud — 2 hole + 3 community cards; fold or raise 1×/2×/3× each street. Pays on your total wagered. Fresh $1000 bankroll."
+	m := NewApp([]game.Game{
+		stubGame{title: "3:2 Blackjack"},
+		descGame{"Mississippi Stud", longDesc},
+	})
+	a := m.(App)
+	sm, _ := a.Update(tea.WindowSizeMsg{Width: 100, Height: 44})
+	a = sm.(App)
+	view := a.View()
+
+	// The masthead cards, the tinted wordmark, both game titles, and the themed
+	// hint are all present.
+	for _, want := range []string{"╭─────╮", "TERMINAL CASINO", "3:2 Blackjack", "Mississippi Stud", "sit down"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("lobby view missing %q", want)
+		}
+	}
+	// The long description wraps inside its tile rather than overflowing: it is
+	// broken across lines, so the full sentence is not present as one run.
+	if strings.Contains(view, longDesc) {
+		t.Fatalf("long description did not wrap inside its tile")
+	}
+}
+
+func TestLobbyViewCompactNoPanic(t *testing.T) {
+	a := newTestApp()
+	// A short terminal drops the masthead; the game tiles must still render.
+	m, _ := a.Update(tea.WindowSizeMsg{Width: 52, Height: 15})
+	a = m.(App)
+	if view := a.View(); !strings.Contains(view, "Alpha") {
+		t.Fatalf("compact lobby missing a game title:\n%s", view)
 	}
 }
