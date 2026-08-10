@@ -15,8 +15,8 @@ const handSize = 3
 // animState is the UI's presentation sub-state, independent of the engine Phase.
 // The engine resolves a round instantly; animState controls how much of that
 // already-computed result has become visible on screen. While it is anything
-// other than animIdle an animation is playing and player input (except q /
-// ctrl+c) is ignored.
+// other than animIdle an animation is playing and player input is ignored (the
+// quit and return-to-lobby keys are handled by the lobby, above this model).
 type animState int
 
 const (

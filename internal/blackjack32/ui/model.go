@@ -100,10 +100,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) handleKey(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := k.String()
 
-	// Global quit.
-	if key == "q" || key == "ctrl+c" {
-		return m, tea.Quit
-	}
+	// Quit and return-to-lobby keys (q, Q, Esc, Ctrl+C) are handled by the lobby
+	// before they reach this model, so they are not handled here.
 
 	// Input is locked while an animation runs (locked decision 3). Keys other
 	// than quit are ignored, not queued — except that during the result the
