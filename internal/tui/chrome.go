@@ -29,9 +29,18 @@ var (
 )
 
 // TitledBox draws a rounded panel around content with a label embedded in the
-// top border. Content may contain ANSI styling and span multiple lines; widths
-// are measured with lipgloss.Width so styled menu pills still align.
+// top border, using the default soft-white border and dim title. It is the
+// default-styled shorthand for TitledBoxWith.
 func TitledBox(title, content string) string {
+	return TitledBoxWith(title, content, panelBorderStyle, panelTitleStyle)
+}
+
+// TitledBoxWith is TitledBox with caller-chosen border and title styles, so a
+// panel can be tinted per state — e.g. a gold border and bright title for the
+// selected lobby tile, soft-white and dim for the rest. Content may contain ANSI
+// styling and span multiple lines; widths are measured with lipgloss.Width so
+// styled menu pills still align.
+func TitledBoxWith(title, content string, border, titleStyle lipgloss.Style) string {
 	lines := strings.Split(content, "\n")
 	inner := 0
 	for _, l := range lines {
@@ -50,18 +59,18 @@ func TitledBox(title, content string) string {
 	}
 
 	var sb strings.Builder
-	sb.WriteString(panelBorderStyle.Render("╭─ ") + panelTitleStyle.Render(title) +
-		panelBorderStyle.Render(" "+strings.Repeat("─", dashes)+"╮"))
+	sb.WriteString(border.Render("╭─ ") + titleStyle.Render(title) +
+		border.Render(" "+strings.Repeat("─", dashes)+"╮"))
 	sb.WriteString("\n")
 	for _, l := range lines {
 		pad := inner - lipgloss.Width(l)
 		if pad < 0 {
 			pad = 0
 		}
-		sb.WriteString(panelBorderStyle.Render("│ ") + l + strings.Repeat(" ", pad) +
-			panelBorderStyle.Render(" │") + "\n")
+		sb.WriteString(border.Render("│ ") + l + strings.Repeat(" ", pad) +
+			border.Render(" │") + "\n")
 	}
-	sb.WriteString(panelBorderStyle.Render("╰" + strings.Repeat("─", interior) + "╯"))
+	sb.WriteString(border.Render("╰" + strings.Repeat("─", interior) + "╯"))
 	return sb.String()
 }
 

@@ -13,6 +13,7 @@ import (
 
 	"github.com/mykeychain/terminal-casino/internal/game"
 	"github.com/mykeychain/terminal-casino/internal/theme"
+	"github.com/mykeychain/terminal-casino/internal/tui"
 )
 
 // state is the App's top-level mode.
@@ -130,47 +131,125 @@ func (a App) View() string {
 	return a.lobbyView()
 }
 
-// Lobby chrome styles, built from the shared theme palette.
-var (
-	lobbyTitleStyle = lipgloss.NewStyle().Bold(true).Foreground(theme.BrightGold)
-	taglineStyle    = lipgloss.NewStyle().Foreground(theme.Dim)
-	selectedStyle   = lipgloss.NewStyle().Bold(true).Foreground(theme.Gold)
-	unselectedStyle = lipgloss.NewStyle().Foreground(theme.SoftWhite)
-	descStyle       = lipgloss.NewStyle().Foreground(theme.Dim)
-	hintStyle       = lipgloss.NewStyle().Foreground(theme.Dim)
+// Below these terminal heights the lobby trades vertical space for fit: compact
+// (3-row) masthead cards under shortHeight, and no masthead at all under
+// minMastheadHeight (the game tiles take priority).
+const (
+	shortHeight       = 28
+	minMastheadHeight = 20
 )
 
-// lobbyView renders the branded title and the selectable game list, centered in
-// the known terminal size.
+// tileWidth is the target inner width of a game tile; descriptions wrap to it so
+// every tile lines up. The divider matches the tile's outer width (inner + 4).
+const tileWidth = 46
+
+// Lobby chrome styles, built from the shared theme palette.
+var (
+	wordmarkStyle = lipgloss.NewStyle().Bold(true).Foreground(theme.BrightGold)
+	taglineStyle  = lipgloss.NewStyle().Foreground(theme.Dim)
+	hintStyle     = lipgloss.NewStyle().Foreground(theme.Dim)
+	dividerStyle  = lipgloss.NewStyle().Foreground(theme.Dim)
+
+	// Suit tints for the wordmark: red ♥ ♦, soft-white ♠ ♣ — matching the cards.
+	suitRedStyle  = lipgloss.NewStyle().Foreground(theme.Red)
+	suitDarkStyle = lipgloss.NewStyle().Foreground(theme.SoftWhite)
+
+	// Game-tile chrome: the selected tile gets a gold border + bright title; the
+	// rest use the default soft-white border with a dim title.
+	tileSelBorderStyle = lipgloss.NewStyle().Foreground(theme.Gold)
+	tileSelTitleStyle  = lipgloss.NewStyle().Bold(true).Foreground(theme.BrightGold)
+	tileBorderStyle    = lipgloss.NewStyle().Foreground(theme.SoftWhite)
+	tileTitleStyle     = lipgloss.NewStyle().Foreground(theme.Dim)
+)
+
+// mastheadFaces spell SSH across three cards — a nod to how you reach the
+// casino. The suits are ♠ ♠ ♥ (Spade Spade Heart) and the rank glyph is the
+// letter itself, so the letters and the suits both say SSH.
+var mastheadFaces = []tui.Face{
+	{Rank: "S", Suit: "♠"},
+	{Rank: "S", Suit: "♠"},
+	{Rank: "H", Suit: "♥", Red: true},
+}
+
+// wordmark renders the branded title with tinted suits framing the name.
+func wordmark() string {
+	return suitDarkStyle.Render("♠") + " " + suitRedStyle.Render("♥") + "  " +
+		wordmarkStyle.Render("TERMINAL CASINO") + "  " +
+		suitRedStyle.Render("♦") + " " + suitDarkStyle.Render("♣")
+}
+
+// masthead lays the three SSH cards side by side, at the chosen vertical density.
+func masthead(short bool) string {
+	cards := make([]string, len(mastheadFaces))
+	for i, f := range mastheadFaces {
+		cards[i] = tui.RenderCard(f, short)
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Top, cards...)
+}
+
+// tileInner returns the game-tile inner width, shrunk to fit a narrow terminal.
+func (a App) tileInner() int {
+	w := tileWidth
+	if a.width > 0 && a.width-8 < w {
+		w = a.width - 8
+	}
+	if w < 20 {
+		w = 20
+	}
+	return w
+}
+
+// gameTile frames one game as a titled panel: the title in the border, the
+// description wrapped to the tile width beneath it. The selected tile is
+// gold-bordered with a bright title and soft-white description; the rest are
+// soft-white and dim.
+func (a App) gameTile(g game.Game, selected bool) string {
+	descColor := theme.Dim
+	border, title := tileBorderStyle, tileTitleStyle
+	if selected {
+		descColor = theme.SoftWhite
+		border, title = tileSelBorderStyle, tileSelTitleStyle
+	}
+	desc := lipgloss.NewStyle().Width(a.tileInner()).Foreground(descColor).Render(g.Description())
+	return tui.TitledBoxWith(g.Title(), desc, border, title)
+}
+
+// lobbyView renders the branded masthead, wordmark, and the framed game tiles,
+// centered in the known terminal size.
 func (a App) lobbyView() string {
-	var b strings.Builder
-	b.WriteString(lobbyTitleStyle.Render("♠ ♥  TERMINAL CASINO  ♦ ♣"))
-	b.WriteString("\n")
-	b.WriteString(taglineStyle.Render("Select a table"))
-	b.WriteString("\n\n")
-
 	if len(a.games) == 0 {
-		b.WriteString(descStyle.Render("No games available."))
-		b.WriteString("\n\n")
-		b.WriteString(hintStyle.Render("q/ctrl+c quit"))
-		return a.frame(b.String())
+		empty := lipgloss.JoinVertical(lipgloss.Center,
+			wordmark(),
+			taglineStyle.Render("No tables open"),
+			"",
+			hintStyle.Render("q/ctrl+c quit"),
+		)
+		return a.frame(empty)
 	}
 
+	short := a.height > 0 && a.height < shortHeight
+	showMasthead := !(a.height > 0 && a.height < minMastheadHeight)
+
+	var parts []string
+	if showMasthead {
+		parts = append(parts, masthead(short), "")
+	}
+	parts = append(parts,
+		wordmark(),
+		taglineStyle.Render("Select a table"),
+		"",
+		dividerStyle.Render(strings.Repeat("─", a.tileInner()+4)),
+		"",
+	)
 	for i, g := range a.games {
-		cursor := "  "
-		titleLine := unselectedStyle.Render(g.Title())
-		if i == a.cursor {
-			cursor = selectedStyle.Render("▸ ")
-			titleLine = selectedStyle.Render(g.Title())
-		}
-		b.WriteString(cursor + titleLine)
-		b.WriteString("\n")
-		b.WriteString("  " + descStyle.Render(g.Description()))
-		b.WriteString("\n\n")
+		parts = append(parts, a.gameTile(g, i == a.cursor))
 	}
+	parts = append(parts,
+		"",
+		hintStyle.Render("↑/↓ (k/j) select · enter sit down · q/ctrl+c quit"),
+	)
 
-	b.WriteString(hintStyle.Render("↑/↓ (k/j) select · enter launch · q/ctrl+c quit"))
-	return a.frame(b.String())
+	return a.frame(lipgloss.JoinVertical(lipgloss.Center, parts...))
 }
 
 // frame centers the lobby content within the known terminal size when available.
