@@ -158,16 +158,49 @@ func TestQuitFromLobby(t *testing.T) {
 	}
 }
 
-func TestQuitFromPlaying(t *testing.T) {
+// TestQReturnsToLobbyWhilePlaying: in a game, q leaves the table for the lobby
+// (it does not quit the program) — the same as Esc.
+func TestQReturnsToLobbyWhilePlaying(t *testing.T) {
 	a := newTestApp()
 	m, _ := a.Update(key("enter"))
 	a = m.(App)
-	_, cmd := a.Update(key("q"))
+	if a.state != statePlaying {
+		t.Fatalf("precondition failed: not playing")
+	}
+
+	m, cmd := a.Update(key("q"))
+	a = m.(App)
+	if a.state != stateLobby {
+		t.Fatalf("q while playing: state = %v, want stateLobby", a.state)
+	}
+	if a.active != nil {
+		t.Fatalf("q while playing should drop the game model, got %T", a.active)
+	}
+	if cmd != nil {
+		t.Fatalf("q while playing should not quit the program")
+	}
+}
+
+// TestQuitEntirelyWhilePlaying: Q quits the whole casino from inside a game.
+func TestQuitEntirelyWhilePlaying(t *testing.T) {
+	a := newTestApp()
+	m, _ := a.Update(key("enter"))
+	a = m.(App)
+	_, cmd := a.Update(key("Q"))
 	if cmd == nil {
-		t.Fatalf("q while playing returned nil cmd, want tea.Quit")
+		t.Fatalf("Q while playing returned nil cmd, want tea.Quit")
 	}
 	if _, ok := cmd().(tea.QuitMsg); !ok {
-		t.Fatalf("q while playing did not produce QuitMsg")
+		t.Fatalf("Q while playing did not produce QuitMsg")
+	}
+}
+
+// TestQuitEntirelyFromLobby: Q also quits from the lobby.
+func TestQuitEntirelyFromLobby(t *testing.T) {
+	a := newTestApp()
+	_, cmd := a.Update(key("Q"))
+	if cmd == nil || func() bool { _, ok := cmd().(tea.QuitMsg); return !ok }() {
+		t.Fatalf("Q in lobby did not produce QuitMsg")
 	}
 }
 

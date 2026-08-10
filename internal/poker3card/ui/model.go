@@ -652,15 +652,15 @@ func (m Model) renderActionBar() string {
 		if !m.game.CanPlay() {
 			body += "\n" + dimStyle.Render("Not enough bankroll to Play — Fold only.")
 		}
-		hint = "← → choose · p play · f fold · enter confirm · ? paytable · q quit"
+		hint = "← → choose · p play · f fold · enter confirm · ? paytable · q lobby · Q quit"
 	case engine.PhaseRoundOver:
 		title = "Round over"
 		body = tui.RenderMenu([]string{"Next hand"}, 0)
-		hint = "enter continue · q quit"
+		hint = "enter continue · q lobby · Q quit"
 	case engine.PhaseGameOver:
 		title = "Game over"
 		body = tui.RenderMenu([]string{"Restart", "Quit"}, tui.ClampIdx(m.cursor, 2))
-		hint = "← → choose · enter confirm · q quit"
+		hint = "← → choose · enter confirm · q lobby · Q quit"
 	}
 	return tui.TitledBox(title, body) + "\n " + dimStyle.Render(hint)
 }
@@ -705,7 +705,7 @@ func (m Model) bettingHint() string {
 		"tab ⇄ switch",
 		"enter deal",
 		"? paytable",
-		"q quit",
+		"q lobby · Q quit",
 	}
 	return strings.Join(parts, " · ")
 }

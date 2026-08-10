@@ -64,19 +64,23 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		key := msg.String()
-		// Global quit from anywhere.
-		if key == "q" || key == "ctrl+c" {
+		// Q or Ctrl+C quits the whole casino from anywhere — lobby or table.
+		if key == "Q" || key == "ctrl+c" {
 			return a, tea.Quit
 		}
 		if a.state == statePlaying {
-			// Esc is intercepted at the App level: drop the game model and
-			// return to the lobby. The game model never sees Esc.
-			if key == "esc" {
+			// In a game, q or Esc leaves the table and returns to the lobby.
+			// Both are intercepted here, so the game model never sees them.
+			if key == "q" || key == "esc" {
 				a.state = stateLobby
 				a.active = nil
 				return a, nil
 			}
 			return a.updatePlaying(msg)
+		}
+		// In the lobby there is no table to leave, so q quits the casino too.
+		if key == "q" {
+			return a, tea.Quit
 		}
 		return a.updateLobby(msg)
 	}
@@ -222,7 +226,7 @@ func (a App) lobbyView() string {
 			wordmark(),
 			taglineStyle.Render("No tables open"),
 			"",
-			hintStyle.Render("q/ctrl+c quit"),
+			hintStyle.Render("q quit"),
 		)
 		return a.frame(empty)
 	}
@@ -246,7 +250,7 @@ func (a App) lobbyView() string {
 	}
 	parts = append(parts,
 		"",
-		hintStyle.Render("↑/↓ (k/j) select · enter sit down · q/ctrl+c quit"),
+		hintStyle.Render("↑/↓ (k/j) select · enter sit down · q quit"),
 	)
 
 	return a.frame(lipgloss.JoinVertical(lipgloss.Center, parts...))
