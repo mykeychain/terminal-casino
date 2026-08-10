@@ -17,7 +17,8 @@ const (
 	animIdle animState = iota
 	// animClearing: the finished hand's cards are being swept off the felt one at a
 	// time before the next hand's betting screen appears. While this runs, player
-	// input (except q / ctrl+c, and enter to skip) is ignored.
+	// input is ignored except enter/space, which skips the sweep (the quit and
+	// return-to-lobby keys are handled by the lobby, above this model).
 	animClearing
 )
 

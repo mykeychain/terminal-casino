@@ -261,8 +261,8 @@ func TestFoldForfeitsAnte(t *testing.T) {
 	}
 }
 
-// TestInputGatedDuringAnimation verifies that, while an animation runs, every key
-// except q/ctrl+c is ignored, and q still quits.
+// TestInputGatedDuringAnimation verifies that, while an animation runs, keys are
+// ignored and the animation does not advance.
 func TestInputGatedDuringAnimation(t *testing.T) {
 	m := newTestModel(1000, 9, 6, scenarioBigWin())
 	m, _ = upd(t, m, keyEnter) // deal -> animDealReveal
@@ -273,13 +273,5 @@ func TestInputGatedDuringAnimation(t *testing.T) {
 	m, _ = upd(t, m, keyEnter) // a normal key must be swallowed
 	if m.animState != before.animState || m.dealShown != before.dealShown {
 		t.Fatalf("gated key advanced animation")
-	}
-	// q still quits mid-animation.
-	_, qcmd := upd(t, m, keyRune('q'))
-	if qcmd == nil {
-		t.Fatal("q returned no command")
-	}
-	if _, ok := qcmd().(tea.QuitMsg); !ok {
-		t.Fatal("q did not produce a QuitMsg")
 	}
 }

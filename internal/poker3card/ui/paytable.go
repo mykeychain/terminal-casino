@@ -29,7 +29,7 @@ var paytableOrder = []engine.HandCategory{
 func (m Model) viewPaytable(f revealFrame) string {
 	top := m.renderTop(f)
 	panel := m.renderPaytable()
-	hint := " " + dimStyle.Render("? close · q quit")
+	hint := " " + dimStyle.Render("? close · q lobby · Q quit")
 
 	if m.width == 0 || m.height == 0 {
 		return top + "\n\n" + panel + "\n\n" + hint

@@ -110,10 +110,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) handleKey(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := k.String()
 
-	// Global quit. Esc is intentionally NOT handled: the lobby intercepts it.
-	if key == "q" || key == "ctrl+c" {
-		return m, tea.Quit
-	}
+	// Quit and return-to-lobby keys (q, Q, Esc, Ctrl+C) are handled by the lobby
+	// before they reach this model, so they are not handled here.
 
 	// Paytable overlay: `?` toggles it from any phase (even mid-animation). While
 	// it is up it acts as a modal — enter/space (or `?`) dismisses it and every
@@ -652,15 +650,15 @@ func (m Model) renderActionBar() string {
 		if !m.game.CanPlay() {
 			body += "\n" + dimStyle.Render("Not enough bankroll to Play — Fold only.")
 		}
-		hint = "← → choose · p play · f fold · enter confirm · ? paytable · q quit"
+		hint = "← → choose · p play · f fold · enter confirm · ? paytable · q lobby · Q quit"
 	case engine.PhaseRoundOver:
 		title = "Round over"
 		body = tui.RenderMenu([]string{"Next hand"}, 0)
-		hint = "enter continue · q quit"
+		hint = "enter continue · q lobby · Q quit"
 	case engine.PhaseGameOver:
 		title = "Game over"
 		body = tui.RenderMenu([]string{"Restart", "Quit"}, tui.ClampIdx(m.cursor, 2))
-		hint = "← → choose · enter confirm · q quit"
+		hint = "← → choose · enter confirm · q lobby · Q quit"
 	}
 	return tui.TitledBox(title, body) + "\n " + dimStyle.Render(hint)
 }
@@ -705,7 +703,7 @@ func (m Model) bettingHint() string {
 		"tab ⇄ switch",
 		"enter deal",
 		"? paytable",
-		"q quit",
+		"q lobby · Q quit",
 	}
 	return strings.Join(parts, " · ")
 }

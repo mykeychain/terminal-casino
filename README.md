@@ -68,7 +68,8 @@ the wager between `◀ ▶`), `←`/`→` move a gold highlight, and `Enter` con
 | Playing | `←` / `→` then `Enter` | Move the highlight over the legal actions (Hit / Stand / Double / Split) and confirm |
 | Round over | `Enter` | Next hand |
 | Game over | `←` / `→` then `Enter` | Select `Restart` (fresh $1000) or `Quit` |
-| Anytime | `q` / `Ctrl+C` | Quit |
+| In a game | `q` or `Esc` | Leave the table, back to the lobby |
+| Anytime | `Q` / `Ctrl+C` | Quit the casino (from a table or the lobby) |
 
 The player-turn menu only lists actions that are currently legal — it is driven
 directly by the engine's legal-action set, so an option never appears for a move

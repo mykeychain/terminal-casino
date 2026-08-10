@@ -41,7 +41,7 @@ var paytableOrder = []paytableRow{
 func (m Model) viewPaytable() string {
 	top := m.renderTop()
 	panel := m.renderPaytable()
-	hint := " " + dimStyle.Render("? close · q quit")
+	hint := " " + dimStyle.Render("? close · q lobby · Q quit")
 
 	if m.width == 0 || m.height == 0 {
 		return top + "\n\n" + panel + "\n\n" + hint

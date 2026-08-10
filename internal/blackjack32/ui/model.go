@@ -100,10 +100,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) handleKey(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := k.String()
 
-	// Global quit.
-	if key == "q" || key == "ctrl+c" {
-		return m, tea.Quit
-	}
+	// Quit and return-to-lobby keys (q, Q, Esc, Ctrl+C) are handled by the lobby
+	// before they reach this model, so they are not handled here.
 
 	// Input is locked while an animation runs (locked decision 3). Keys other
 	// than quit are ignored, not queued — except that during the result the
@@ -633,7 +631,7 @@ func (m Model) renderActionBar() string {
 			insuranceCostStyle.Render(fmt.Sprintf(" $%d ", half)) +
 			dimStyle.Render(" ?") +
 			"\n" + tui.RenderMenu([]string{"Yes", "No"}, tui.ClampIdx(m.cursor, 2))
-		hint = "← → choose · enter confirm · q quit"
+		hint = "← → choose · enter confirm · q lobby · Q quit"
 	case engine.PhasePlayerTurn:
 		title = "Your move"
 		actions := m.playerActions()
@@ -642,15 +640,15 @@ func (m Model) renderActionBar() string {
 			labels[i] = actionLabel(a)
 		}
 		body = tui.RenderMenu(labels, tui.ClampIdx(m.cursor, len(actions)))
-		hint = "← → choose · enter confirm · q quit"
+		hint = "← → choose · enter confirm · q lobby · Q quit"
 	case engine.PhaseRoundOver:
 		title = "Round over"
 		body = tui.RenderMenu([]string{"Next hand"}, 0)
-		hint = "enter continue · q quit"
+		hint = "enter continue · q lobby · Q quit"
 	case engine.PhaseGameOver:
 		title = "Game over"
 		body = tui.RenderMenu([]string{"Restart", "Quit"}, tui.ClampIdx(m.cursor, 2))
-		hint = "← → choose · enter confirm · q quit"
+		hint = "← → choose · enter confirm · q lobby · Q quit"
 	}
 	return tui.TitledBox(title, body) + "\n " + dimStyle.Render(hint)
 }
@@ -716,7 +714,7 @@ func (m Model) bettingHint() string {
 	if n > 1 {
 		parts = append(parts, "x remove")
 	}
-	parts = append(parts, "enter deal", "q quit")
+	parts = append(parts, "enter deal", "q lobby · Q quit")
 	return strings.Join(parts, " · ")
 }
 

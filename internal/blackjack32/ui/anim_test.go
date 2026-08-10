@@ -93,8 +93,8 @@ func standIndex(t *testing.T, m Model) int {
 
 // ---- tests ----
 
-// TestInputGatedDuringAnimation verifies that, while an animation runs, every
-// key except q/ctrl+c is ignored (state does not advance), and q still quits.
+// TestInputGatedDuringAnimation verifies that, while an animation runs, keys are
+// ignored: the animation state does not advance and the engine phase is unchanged.
 func TestInputGatedDuringAnimation(t *testing.T) {
 	m := newModel(1000, engine.Ten, engine.Six, engine.Nine, engine.Ten, engine.Ten)
 	m, cmd := upd(t, m, keyEnter) // deal
@@ -114,15 +114,6 @@ func TestInputGatedDuringAnimation(t *testing.T) {
 	}
 	if m.game.Phase() != before.game.Phase() {
 		t.Fatal("gated key changed engine phase")
-	}
-
-	// q must still quit even mid-animation.
-	_, qcmd := upd(t, m, keyRune('q'))
-	if qcmd == nil {
-		t.Fatal("q returned no command")
-	}
-	if _, ok := qcmd().(tea.QuitMsg); !ok {
-		t.Fatal("q did not produce a QuitMsg")
 	}
 }
 
