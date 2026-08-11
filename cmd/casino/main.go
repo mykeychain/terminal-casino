@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/mykeychain/terminal-casino/internal/blackjack32"
+	"github.com/mykeychain/terminal-casino/internal/blackjackfreebet"
 	"github.com/mykeychain/terminal-casino/internal/casino"
 	"github.com/mykeychain/terminal-casino/internal/game"
 	"github.com/mykeychain/terminal-casino/internal/mississippistud"
@@ -24,6 +25,7 @@ func main() {
 
 	games := []game.Game{
 		blackjack32.Game(),
+		blackjackfreebet.Game(),
 		poker3card.Game(),
 		mississippistud.Game(),
 	}

@@ -24,6 +24,7 @@ import (
 	bm "github.com/charmbracelet/wish/bubbletea"
 
 	"github.com/mykeychain/terminal-casino/internal/blackjack32"
+	"github.com/mykeychain/terminal-casino/internal/blackjackfreebet"
 	"github.com/mykeychain/terminal-casino/internal/casino"
 	"github.com/mykeychain/terminal-casino/internal/game"
 	"github.com/mykeychain/terminal-casino/internal/mississippistud"
@@ -114,7 +115,7 @@ func (sl *sessionLimiter) middleware(next ssh.Handler) ssh.Handler {
 // teaHandler builds a fresh casino App for each SSH session. The game registry is
 // wired here, so adding a game later is a one-line change.
 func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
-	games := []game.Game{blackjack32.Game(), poker3card.Game(), mississippistud.Game()}
+	games := []game.Game{blackjack32.Game(), blackjackfreebet.Game(), poker3card.Game(), mississippistud.Game()}
 	return casino.NewApp(games), []tea.ProgramOption{tea.WithAltScreen()}
 }
 
