@@ -23,13 +23,13 @@ func actionIndex(t *testing.T, m Model, want engine.Action) int {
 }
 
 // TestFreeDoubleLabelShown: a two-card hard 11 offers a free double, and the
-// action bar flags it "· FREE" so the player sees the house is paying.
+// action bar names it "Free Double" so the player sees the house is paying.
 func TestFreeDoubleLabelShown(t *testing.T) {
 	m := newModel(1000, engine.Five, engine.Seven, engine.Six, engine.Ten)
 	m, _ = upd(t, m, keyEnter)
 	m = advanceDeal(t, m)
 	bar := stripANSI(m.renderActionBar())
-	if !strings.Contains(bar, "Double · FREE") {
+	if !strings.Contains(bar, "Free Double") {
 		t.Fatalf("action bar = %q, want it to advertise a free double", bar)
 	}
 }
@@ -57,10 +57,10 @@ func TestFreeSplitLabelShownOwnMoneyDoublePlain(t *testing.T) {
 	m, _ = upd(t, m, keyEnter)
 	m = advanceDeal(t, m)
 	bar := stripANSI(m.renderActionBar())
-	if !strings.Contains(bar, "Split · FREE") {
+	if !strings.Contains(bar, "Free Split") {
 		t.Fatalf("action bar = %q, want it to advertise a free split", bar)
 	}
-	if strings.Contains(bar, "Double · FREE") {
+	if strings.Contains(bar, "Free Double") {
 		t.Fatalf("action bar = %q, an own-money double on hard 16 must not be labeled free", bar)
 	}
 }

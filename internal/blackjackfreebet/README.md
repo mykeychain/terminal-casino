@@ -24,7 +24,7 @@ at-risk money stays gold.
 
 Doubling a hard 9, 10, or 11 is **free**: the house matches your wager, you draw
 exactly one card, and a win pays as though you had doubled for real. The action
-bar labels it **`Double · FREE`**.
+bar names it **`Free Double`** (tinted green).
 
 You may still double **any other** two-card total (a hard 8, a soft hand, …), but
 that one costs **your own money** — a real extra bet is escrowed, so it's offered
@@ -32,8 +32,8 @@ only when your bankroll can cover it.
 
 ### 2. Free split — on any pair except tens
 
-Splitting **any pair is free** — 2s through 9s, and aces — labeled
-**`Split · FREE`**. Each split hand rides a free bet; free **re-splitting** is
+Splitting **any pair is free** — 2s through 9s, and aces — named
+**`Free Split`**. Each split hand rides a free bet; free **re-splitting** is
 allowed up to four hands per spot. **Split aces** take exactly one card each and
 cannot be hit, doubled, or re-split. A free-split hand can then **free-double** if
 it makes a hard 9/10/11.
@@ -77,10 +77,10 @@ The important exceptions:
 
 Identical to the 3:2 table — arrow-driven menus, `Enter` to confirm. The
 player-turn menu only lists currently-legal actions, driven by the engine's
-legal-action set, and flags a double or split **`· FREE`** — tinted **green**,
-the same "on the house" accent as the free bet on your hand — when the house is
-paying for it. An own-money double or split stays plain white, so free vs. paid
-reads at a glance.
+legal-action set, and names a free double or split **`Free Double`** /
+**`Free Split`** — tinted **green**, the same "on the house" accent as the free
+bet on your hand. An own-money double or split keeps the plain **`Double`** /
+**`Split`** in white, so free vs. paid reads at a glance.
 
 | Phase | Keys | Action |
 |---|---|---|

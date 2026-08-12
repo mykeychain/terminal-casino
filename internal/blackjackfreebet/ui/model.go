@@ -731,10 +731,11 @@ func (m Model) bettingHint() string {
 	return strings.Join(parts, " · ")
 }
 
-// actionLabel maps a legal engine action to its menu label. Double and Split are
-// flagged "· FREE" when the active hand qualifies for a house-funded free bet (a
-// two-card hard 9/10/11 double, or any non-ten pair split), so the player can see
-// which of the two is on offer before committing.
+// actionLabel maps a legal engine action to its menu label. A double or split is
+// named "Free Double" / "Free Split" (and tinted green by renderActionBar) when
+// the active hand qualifies for a house-funded free bet — a two-card hard 9/10/11
+// double, or any non-ten pair split — so the player can see which is on offer
+// before committing; an own-money double/split keeps the plain name.
 func (m Model) actionLabel(a engine.Action) string {
 	switch a {
 	case engine.ActionHit:
@@ -743,12 +744,12 @@ func (m Model) actionLabel(a engine.Action) string {
 		return "Stand"
 	case engine.ActionDouble:
 		if m.game.DoubleIsFree() {
-			return "Double · FREE"
+			return "Free Double"
 		}
 		return "Double"
 	case engine.ActionSplit:
 		if m.game.SplitIsFree() {
-			return "Split · FREE"
+			return "Free Split"
 		}
 		return "Split"
 	default:
