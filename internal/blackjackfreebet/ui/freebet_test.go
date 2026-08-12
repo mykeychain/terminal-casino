@@ -4,7 +4,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/lipgloss"
+
 	"github.com/mykeychain/terminal-casino/internal/blackjackfreebet/engine"
+	"github.com/mykeychain/terminal-casino/internal/theme"
 )
 
 // actionIndex returns how many "right" presses select the given action.
@@ -28,6 +31,22 @@ func TestFreeDoubleLabelShown(t *testing.T) {
 	bar := stripANSI(m.renderActionBar())
 	if !strings.Contains(bar, "Double · FREE") {
 		t.Fatalf("action bar = %q, want it to advertise a free double", bar)
+	}
+}
+
+// TestFreeActionRendersInGreenAccent: an unselected free action is tinted with
+// the green "on the house" accent, distinguishing it from the plain actions.
+func TestFreeActionRendersInGreenAccent(t *testing.T) {
+	m := newModel(1000, engine.Five, engine.Seven, engine.Six, engine.Ten) // 5,6 = free double
+	m, _ = upd(t, m, keyEnter)
+	m = advanceDeal(t, m)
+	// Cursor sits on Hit (index 0), so the free Double is unselected and must
+	// carry the green accent rather than the plain soft-white style.
+	bar := m.renderActionBar()
+	probe := lipgloss.NewStyle().Foreground(theme.Green).Render("X")
+	greenSeq := probe[:strings.Index(probe, "X")] // the opening SGR for the green accent
+	if !strings.Contains(bar, greenSeq) {
+		t.Fatalf("free action should render in the green accent; action bar lacks the green SGR")
 	}
 }
 

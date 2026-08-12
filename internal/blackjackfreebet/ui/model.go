@@ -644,10 +644,15 @@ func (m Model) renderActionBar() string {
 		title = "Your move"
 		actions := m.playerActions()
 		labels := make([]string, len(actions))
+		accent := make([]bool, len(actions))
 		for i, a := range actions {
 			labels[i] = m.actionLabel(a)
+			// Mark a free double/split so the menu tints it green — the same
+			// "on the house" accent as the free bet shown on the hand.
+			accent[i] = (a == engine.ActionDouble && m.game.DoubleIsFree()) ||
+				(a == engine.ActionSplit && m.game.SplitIsFree())
 		}
-		body = tui.RenderMenu(labels, tui.ClampIdx(m.cursor, len(actions)))
+		body = tui.RenderMenuAccented(labels, tui.ClampIdx(m.cursor, len(actions)), accent)
 		hint = "← → choose · enter confirm · q lobby · Q quit"
 	case engine.PhaseRoundOver:
 		title = "Round over"

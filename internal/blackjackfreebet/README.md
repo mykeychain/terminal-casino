@@ -77,8 +77,10 @@ The important exceptions:
 
 Identical to the 3:2 table — arrow-driven menus, `Enter` to confirm. The
 player-turn menu only lists currently-legal actions, driven by the engine's
-legal-action set, and flags a double or split **`· FREE`** when the house is
-paying for it.
+legal-action set, and flags a double or split **`· FREE`** — tinted **green**,
+the same "on the house" accent as the free bet on your hand — when the house is
+paying for it. An own-money double or split stays plain white, so free vs. paid
+reads at a glance.
 
 | Phase | Keys | Action |
 |---|---|---|
