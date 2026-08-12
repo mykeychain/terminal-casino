@@ -26,6 +26,13 @@ var (
 	menuUnselectedStyle = lipgloss.NewStyle().
 				Foreground(theme.SoftWhite).
 				Padding(0, 1)
+
+	// menuAccentStyle renders an unselected menu item that a game wants to mark as
+	// special — green, the shared "bonus / on the house" accent. The gold selection
+	// pill still wins when the item is the selected one.
+	menuAccentStyle = lipgloss.NewStyle().
+			Foreground(theme.Green).
+			Padding(0, 1)
 )
 
 // TitledBox draws a rounded panel around content with a label embedded in the
@@ -77,14 +84,26 @@ func TitledBoxWith(title, content string, border, titleStyle lipgloss.Style) str
 // RenderMenu lays a set of labels out horizontally, highlighting the selected
 // one in gold.
 func RenderMenu(labels []string, selected int) string {
+	return RenderMenuAccented(labels, selected, nil)
+}
+
+// RenderMenuAccented is RenderMenu with a per-item accent flag. An accented item
+// that is not the selected one is rendered in the green accent (marking it as
+// special, e.g. a free/house-funded action) instead of plain soft white; the
+// selected item always takes the gold selection pill regardless of its accent.
+// accent may be shorter than labels (or nil) — missing entries are treated false.
+func RenderMenuAccented(labels []string, selected int, accent []bool) string {
 	if len(labels) == 0 {
 		return ""
 	}
 	parts := make([]string, len(labels))
 	for i, l := range labels {
-		if i == selected {
+		switch {
+		case i == selected:
 			parts[i] = menuSelectedStyle.Render(l)
-		} else {
+		case i < len(accent) && accent[i]:
+			parts[i] = menuAccentStyle.Render(l)
+		default:
 			parts[i] = menuUnselectedStyle.Render(l)
 		}
 	}
