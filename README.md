@@ -6,8 +6,11 @@ pick a table from the lobby, and play. The lobby offers **3:2 Blackjack** (class
 rules with up to three hands, split, double, and insurance), **Free Bet Blackjack**
 (free doubles and splits, with the dealer pushing on 22 — see
 [`internal/blackjackfreebet/README.md`](internal/blackjackfreebet/README.md)), **3-Card
-Poker**, and **Mississippi Stud** (a fold-or-raise stud game paid on your total wagered —
-see [`internal/mississippistud/README.md`](internal/mississippistud/README.md)).
+Poker**, **Mississippi Stud** (a fold-or-raise stud game paid on your total wagered —
+see [`internal/mississippistud/README.md`](internal/mississippistud/README.md)), **I Luv
+Suits** (seven cards each, the longest flush wins — see
+[`internal/iluvsuits/README.md`](internal/iluvsuits/README.md)), and **DJ Wild** (five-card
+stud with deuces and a joker wild — see [`internal/djwild/README.md`](internal/djwild/README.md)).
 
 Each session is independent: a fresh $1000 bankroll, no accounts, no persistence
 (bankroll resets when you leave). The game engine is a pure, UI-agnostic Go package;
@@ -132,6 +135,8 @@ terminal-casino/
     blackjackfreebet/         "Free Bet Blackjack" — free doubles/splits, dealer pushes on 22 (see its README)
     poker3card/               "3-Card Poker" — Ante/Play vs. dealer + Pair Plus (adapter → game.Game)
     mississippistud/          "Mississippi Stud" — fold/raise across three streets, paid on total wagered (see its README)
+    iluvsuits/                "I Luv Suits" — 7-card flush showdown vs. the dealer + Flush Rush side bets (see its README)
+    djwild/                   "DJ Wild" — deuces & joker wild stud, Ante/Blind/Play + Trips (see its README)
     tui/                      shared card rendering + chrome reused across games
 ```
 

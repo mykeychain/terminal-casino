@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/mykeychain/terminal-casino/internal/game"
 )
@@ -272,5 +273,41 @@ func TestLobbyViewCompactNoPanic(t *testing.T) {
 	a = m.(App)
 	if view := a.View(); !strings.Contains(view, "Alpha") {
 		t.Fatalf("compact lobby missing a game title:\n%s", view)
+	}
+}
+
+// TestLobbyCondensesWhenTooTall: when the full tile list cannot fit the
+// terminal, the lobby keeps only the selected game's tile (with its description)
+// and lists every other game as a one-line title, so the whole lobby fits.
+func TestLobbyCondensesWhenTooTall(t *testing.T) {
+	desc := "A table game description long enough to wrap across two or three lines of a lobby tile. Fresh $1000 bankroll."
+	var games []game.Game
+	for _, title := range []string{"Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot"} {
+		games = append(games, descGame{title, title + " — " + desc})
+	}
+	a := NewApp(games).(App)
+	m, _ := a.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	view := m.View()
+
+	if h := lipgloss.Height(view); h > 24 {
+		t.Fatalf("lobby is %d rows, want it to fit 24", h)
+	}
+	for _, title := range []string{"Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot"} {
+		if !strings.Contains(view, title) {
+			t.Errorf("condensed lobby missing %q", title)
+		}
+	}
+	if !strings.Contains(view, "Bravo —") {
+		t.Error("the selected game's description must stay visible")
+	}
+	if strings.Contains(view, "Alpha —") {
+		t.Error("unselected games must collapse to their titles")
+	}
+
+	// A tall terminal keeps every full tile.
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 100, Height: 60})
+	if view := m.View(); !strings.Contains(view, "Alpha —") {
+		t.Error("a tall lobby must show every description")
 	}
 }

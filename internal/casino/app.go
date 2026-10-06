@@ -245,15 +245,31 @@ func (a App) lobbyView() string {
 		dividerStyle.Render(strings.Repeat("─", a.tileInner()+4)),
 		"",
 	)
-	for i, g := range a.games {
-		parts = append(parts, a.gameTile(g, i == a.cursor))
-	}
-	parts = append(parts,
-		"",
-		hintStyle.Render("↑/↓ (k/j) select · enter sit down · q quit"),
-	)
+	footer := []string{"", hintStyle.Render("↑/↓ (k/j) select · enter sit down · q quit")}
 
-	return a.frame(lipgloss.JoinVertical(lipgloss.Center, parts...))
+	full := lipgloss.JoinVertical(lipgloss.Center, append(append(parts, a.tiles(false)...), footer...)...)
+	if a.height <= 0 || lipgloss.Height(full) <= a.height {
+		return a.frame(full)
+	}
+	// Too tall for the terminal: keep only the selected game's full tile and list
+	// the rest as one-line titles.
+	return a.frame(lipgloss.JoinVertical(lipgloss.Center, append(append(parts, a.tiles(true)...), footer...)...))
+}
+
+// tiles renders the game list. Normally every game gets a full tile; condensed,
+// only the selected game does and the others shrink to a single dim title row
+// (padded to the tile width so the column stays centered and steady).
+func (a App) tiles(condensed bool) []string {
+	out := make([]string, len(a.games))
+	for i, g := range a.games {
+		switch {
+		case !condensed || i == a.cursor:
+			out[i] = a.gameTile(g, i == a.cursor)
+		default:
+			out[i] = tileTitleStyle.Render(tui.PadRight("   "+g.Title(), a.tileInner()+4))
+		}
+	}
+	return out
 }
 
 // frame centers the lobby content within the known terminal size when available.
