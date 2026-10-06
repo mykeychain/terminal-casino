@@ -137,15 +137,15 @@ func (a App) View() string {
 
 // Below these terminal heights the lobby trades vertical space for fit: compact
 // (3-row) masthead cards under shortHeight, and no masthead at all under
-// minMastheadHeight (the game tiles take priority).
+// minMastheadHeight (the game list takes priority).
 const (
 	shortHeight       = 28
 	minMastheadHeight = 20
 )
 
-// tileWidth is the target inner width of a game tile; descriptions wrap to it so
-// every tile lines up. The divider matches the tile's outer width (inner + 4).
-const tileWidth = 46
+// dividerWidth is the width of the rule separating the masthead from the game
+// list; it shrinks to fit a narrow terminal.
+const dividerWidth = 50
 
 // Lobby chrome styles, built from the shared theme palette.
 var (
@@ -158,12 +158,15 @@ var (
 	suitRedStyle  = lipgloss.NewStyle().Foreground(theme.Red)
 	suitDarkStyle = lipgloss.NewStyle().Foreground(theme.SoftWhite)
 
-	// Game-tile chrome: the selected tile gets a gold border + bright title; the
-	// rest use the default soft-white border with a dim title.
-	tileSelBorderStyle = lipgloss.NewStyle().Foreground(theme.Gold)
-	tileSelTitleStyle  = lipgloss.NewStyle().Bold(true).Foreground(theme.BrightGold)
-	tileBorderStyle    = lipgloss.NewStyle().Foreground(theme.SoftWhite)
-	tileTitleStyle     = lipgloss.NewStyle().Foreground(theme.Dim)
+	// Game list: the selected row gets a gold marker and bold bright-gold title;
+	// the rest are dim. The selected game's tagline sits beneath the list.
+	markerStyle      = lipgloss.NewStyle().Foreground(theme.Gold)
+	itemSelStyle     = lipgloss.NewStyle().Bold(true).Foreground(theme.BrightGold)
+	itemStyle        = lipgloss.NewStyle().Foreground(theme.Dim)
+	gameTaglineStyle = lipgloss.NewStyle().Foreground(theme.Dim)
+
+	// Footer hint: the keys in soft white, their actions dim.
+	hintKeyStyle = lipgloss.NewStyle().Foreground(theme.SoftWhite)
 )
 
 // mastheadFaces spell SSH across three cards — a nod to how you reach the
@@ -191,11 +194,11 @@ func masthead(short bool) string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, cards...)
 }
 
-// tileInner returns the game-tile inner width, shrunk to fit a narrow terminal.
-func (a App) tileInner() int {
-	w := tileWidth
-	if a.width > 0 && a.width-8 < w {
-		w = a.width - 8
+// dividerInner returns the divider width, shrunk to fit a narrow terminal.
+func (a App) dividerInner() int {
+	w := dividerWidth
+	if a.width > 0 && a.width-4 < w {
+		w = a.width - 4
 	}
 	if w < 20 {
 		w = 20
@@ -203,23 +206,31 @@ func (a App) tileInner() int {
 	return w
 }
 
-// gameTile frames one game as a titled panel: the title in the border, the
-// description wrapped to the tile width beneath it. The selected tile is
-// gold-bordered with a bright title and soft-white description; the rest are
-// soft-white and dim.
-func (a App) gameTile(g game.Game, selected bool) string {
-	descColor := theme.Dim
-	border, title := tileBorderStyle, tileTitleStyle
-	if selected {
-		descColor = theme.SoftWhite
-		border, title = tileSelBorderStyle, tileSelTitleStyle
+// gameList renders the games as a left-aligned column of titles: the selected
+// one marked with a gold ▸ and a bold bright-gold title, the rest dim.
+func (a App) gameList() string {
+	rows := make([]string, len(a.games))
+	for i, g := range a.games {
+		if i == a.cursor {
+			rows[i] = markerStyle.Render("▸ ") + itemSelStyle.Render(g.Title())
+		} else {
+			rows[i] = "  " + itemStyle.Render(g.Title())
+		}
 	}
-	desc := lipgloss.NewStyle().Width(a.tileInner()).Foreground(descColor).Render(g.Description())
-	return tui.TitledBoxWith(g.Title(), desc, border, title)
+	return lipgloss.JoinVertical(lipgloss.Left, rows...)
 }
 
-// lobbyView renders the branded masthead, wordmark, and the framed game tiles,
-// centered in the known terminal size.
+// hints renders the footer key legend.
+func hints() string {
+	pair := func(key, action string) string {
+		return hintKeyStyle.Render(key) + " " + hintStyle.Render(action)
+	}
+	return pair("↑↓", "choose") + "   " + pair("enter", "play") + "   " + pair("q", "quit")
+}
+
+// lobbyView renders the branded masthead and wordmark above a divider, then the
+// game list, the selected game's tagline, and the key hints, centered in the
+// known terminal size.
 func (a App) lobbyView() string {
 	if len(a.games) == 0 {
 		empty := lipgloss.JoinVertical(lipgloss.Center,
@@ -242,15 +253,13 @@ func (a App) lobbyView() string {
 		wordmark(),
 		taglineStyle.Render("Select a table"),
 		"",
-		dividerStyle.Render(strings.Repeat("─", a.tileInner()+4)),
+		dividerStyle.Render(strings.Repeat("─", a.dividerInner())),
 		"",
-	)
-	for i, g := range a.games {
-		parts = append(parts, a.gameTile(g, i == a.cursor))
-	}
-	parts = append(parts,
+		a.gameList(),
 		"",
-		hintStyle.Render("↑/↓ (k/j) select · enter sit down · q quit"),
+		gameTaglineStyle.Render(a.games[a.cursor].Description()),
+		"",
+		hints(),
 	)
 
 	return a.frame(lipgloss.JoinVertical(lipgloss.Center, parts...))

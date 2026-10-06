@@ -11,7 +11,8 @@ import tea "github.com/charmbracelet/bubbletea"
 type Game interface {
 	// Title is the game's short display name (e.g. "3:2 Blackjack").
 	Title() string
-	// Description is a one-line summary shown under the title in the lobby.
+	// Description is a short tagline (a few words) shown beneath the game list
+	// in the lobby while the game is selected.
 	Description() string
 	// New builds a fresh game model pre-seeded with the given terminal size.
 	New(width, height int) tea.Model

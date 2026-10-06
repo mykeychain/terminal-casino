@@ -23,7 +23,7 @@ type adapter struct{}
 func (adapter) Title() string { return "Free Bet Blackjack" }
 
 func (adapter) Description() string {
-	return "6-deck blackjack — free doubles & splits, dealer pushes on 22. Up to 3 hands. Fresh $1000 bankroll."
+	return "free doubles & splits · dealer 22 pushes"
 }
 
 // New builds a fresh Free Bet Blackjack model over a newly-seeded game and

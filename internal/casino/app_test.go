@@ -231,37 +231,36 @@ func TestWindowSizeStored(t *testing.T) {
 	}
 }
 
-// descGame is a game.Game with a custom description, for exercising tile wrapping.
-type descGame struct {
-	title, desc string
-}
-
-func (g descGame) Title() string          { return g.title }
-func (g descGame) Description() string    { return g.desc }
-func (g descGame) New(w, h int) tea.Model { return stubModel{} }
-
 func TestLobbyViewRenders(t *testing.T) {
-	longDesc := "Mississippi Stud — 2 hole + 3 community cards; fold or raise 1×/2×/3× each street. Pays on your total wagered. Fresh $1000 bankroll."
 	m := NewApp([]game.Game{
 		stubGame{title: "3:2 Blackjack"},
-		descGame{"Mississippi Stud", longDesc},
+		stubGame{title: "Mississippi Stud"},
 	})
 	a := m.(App)
 	sm, _ := a.Update(tea.WindowSizeMsg{Width: 100, Height: 44})
 	a = sm.(App)
 	view := a.View()
 
-	// The masthead cards, the tinted wordmark, both game titles, and the themed
-	// hint are all present.
-	for _, want := range []string{"╭─────╮", "TERMINAL CASINO", "3:2 Blackjack", "Mississippi Stud", "sit down"} {
+	// The masthead cards, the wordmark, both game titles, the selection marker,
+	// and the hint are all present.
+	for _, want := range []string{"╭─────╮", "TERMINAL CASINO", "3:2 Blackjack", "Mississippi Stud", "▸", "play"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("lobby view missing %q", want)
 		}
 	}
-	// The long description wraps inside its tile rather than overflowing: it is
-	// broken across lines, so the full sentence is not present as one run.
-	if strings.Contains(view, longDesc) {
-		t.Fatalf("long description did not wrap inside its tile")
+	// Only the selected game's tagline is shown.
+	if !strings.Contains(view, "desc for 3:2 Blackjack") {
+		t.Fatalf("lobby view missing the selected game's tagline")
+	}
+	if strings.Contains(view, "desc for Mississippi Stud") {
+		t.Fatalf("lobby view shows an unselected game's tagline")
+	}
+
+	// Moving the cursor swaps which tagline is shown.
+	dm, _ := a.Update(tea.KeyMsg{Type: tea.KeyDown})
+	view = dm.(App).View()
+	if !strings.Contains(view, "desc for Mississippi Stud") || strings.Contains(view, "desc for 3:2 Blackjack") {
+		t.Fatalf("tagline did not follow the cursor")
 	}
 }
 
