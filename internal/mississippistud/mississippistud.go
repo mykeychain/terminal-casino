@@ -23,7 +23,7 @@ type adapter struct{}
 func (adapter) Title() string { return "Mississippi Stud" }
 
 func (adapter) Description() string {
-	return "Mississippi Stud — 2 hole + 3 community cards; fold or raise 1×/2×/3× each street. Pays on your total wagered. Fresh $1000 bankroll."
+	return "fold or raise every street"
 }
 
 // New builds a fresh Mississippi Stud model over a newly-seeded game and

@@ -23,7 +23,7 @@ type adapter struct{}
 func (adapter) Title() string { return "3-Card Poker" }
 
 func (adapter) Description() string {
-	return "Three-card poker — Ante/Play vs. the dealer plus a Pair Plus side bet. Fresh $1000 bankroll."
+	return "ante / play · pair plus"
 }
 
 // New builds a fresh Three-Card Poker model over a newly-seeded game and
